@@ -13,8 +13,12 @@ import sys
 import numpy as np
 import pandas as pd
 
-# Add project root to sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Add subdirectories to sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+for sub in ["02_Data_Pipeline", "03_Model_Development", "04_Backtesting_Evaluation"]:
+    sub_path = os.path.join(PROJECT_ROOT, sub)
+    if sub_path not in sys.path:
+        sys.path.insert(0, sub_path)
 
 try:
     import streamlit as st
@@ -24,9 +28,9 @@ try:
 except ImportError:
     STREAMLIT_AVAILABLE = False
 
-from 03_Model_Development.env.trading_env import RiskAwareTradingEnv
-from 04_Backtesting_Evaluation.metrics import evaluate_portfolio
-from 02_Data_Pipeline.data_collector import fetch_market_data, add_features
+from env.trading_env import RiskAwareTradingEnv
+from metrics import evaluate_portfolio
+from data_collector import fetch_market_data, add_features
 
 
 def main():

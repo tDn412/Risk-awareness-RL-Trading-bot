@@ -12,12 +12,16 @@ import argparse
 import numpy as np
 import pandas as pd
 
-# Add project root to sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Add subdirectories to sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+for sub in ["02_Data_Pipeline", "03_Model_Development", "04_Backtesting_Evaluation"]:
+    sub_path = os.path.join(PROJECT_ROOT, sub)
+    if sub_path not in sys.path:
+        sys.path.insert(0, sub_path)
 
-from 03_Model_Development.env.trading_env import RiskAwareTradingEnv
-from 04_Backtesting_Evaluation.metrics import evaluate_portfolio, print_metrics_summary
-from 02_Data_Pipeline.data_collector import fetch_market_data, add_features
+from env.trading_env import RiskAwareTradingEnv
+from metrics import evaluate_portfolio, print_metrics_summary
+from data_collector import fetch_market_data, add_features
 
 
 def backtest_buy_and_hold(df: pd.DataFrame, initial_balance: float = 10_000.0):
