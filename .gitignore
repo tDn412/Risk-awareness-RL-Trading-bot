@@ -27,10 +27,10 @@ share/python-wheels/
 MANIFEST
 
 # Virtual environments
-venv/
-.venv/
-ENV/
-env/
+/venv/
+/.venv/
+/ENV/
+/env/
 
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints
