@@ -4,8 +4,10 @@
   "description": "Remotion video and slides presentation for Risk-Aware RL for VN30 Portfolio Allocation",
   "scripts": {
     "dev": "remotion preview src/index.ts",
-    "build": "remotion render src/index.ts MainPresentation out/vn30_risk_aware_rl_presentation.mp4",
-    "render": "remotion render src/index.ts MainPresentation out/vn30_risk_aware_rl_presentation.mp4"
+    "render": "remotion render src/index.ts TikTokPresentation out/vn30_tiktok_video.mp4",
+    "render:tiktok": "remotion render src/index.ts TikTokPresentation out/vn30_tiktok_video.mp4",
+    "render:landscape": "remotion render src/index.ts MainPresentation out/vn30_landscape_presentation.mp4",
+    "stills:tiktok": "remotion still src/index.ts TikTok-01-Hook out/tiktok_scene1.png && remotion still src/index.ts TikTok-02-RiskBlind out/tiktok_scene2.png && remotion still src/index.ts TikTok-03-HoseRules out/tiktok_scene3.png && remotion still src/index.ts TikTok-04-Gaps out/tiktok_scene4.png && remotion still src/index.ts TikTok-05-Solution out/tiktok_scene5.png && remotion still src/index.ts TikTok-06-Targets out/tiktok_scene6.png"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.0",
