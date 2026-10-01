@@ -1,0 +1,22 @@
+{
+  "name": "vn30-risk-aware-rl-presentation",
+  "version": "1.0.0",
+  "description": "Remotion video and slides presentation for Risk-Aware RL for VN30 Portfolio Allocation",
+  "scripts": {
+    "dev": "remotion preview src/index.ts",
+    "build": "remotion render src/index.ts MainPresentation out/vn30_risk_aware_rl_presentation.mp4",
+    "render": "remotion render src/index.ts MainPresentation out/vn30_risk_aware_rl_presentation.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.4.0"
+  },
+  "license": "MIT"
+}
