@@ -27,7 +27,7 @@ export const Root: React.FC = () => {
       <Composition
         id="TikTokPresentation"
         component={TikTokPresentation}
-        durationInFrames={1140} // 38.00 sec total at 30 fps
+        durationInFrames={1470} // 49.00 sec total at 30 fps (synchronized with AI voiceover)
         fps={30}
         width={1080}
         height={1920}

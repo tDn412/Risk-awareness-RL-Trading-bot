@@ -212,13 +212,13 @@ export const Scene6Targets: React.FC = () => {
         }}
       >
         <div style={{ color: "#38BDF8", fontSize: 16, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1.5 }}>
-          DỰ ÁN ANTIGRAVITY • INT3011E
+          ĐỒ ÁN NGHIÊN CỨU • INT3011E
         </div>
         <div style={{ color: "#FFFFFF", fontSize: 26, fontWeight: 900, marginTop: 4 }}>
           Risk-Aware RL for VN30 Portfolio Allocation
         </div>
-        <div style={{ color: "#CBD5E1", fontSize: 16, marginTop: 8 }}>
-          Nhóm thực hiện: Như Đình Tú • Nguyễn Văn Mạnh • Hạn bảo vệ: 02/10/2026
+        <div style={{ color: "#38BDF8", fontSize: 18, fontWeight: 700, marginTop: 8 }}>
+          Thực hiện: Chúng tôi
         </div>
       </div>
     </div>

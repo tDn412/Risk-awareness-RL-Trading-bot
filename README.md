@@ -1,4 +1,4 @@
-# 🛡️ Antigravity: Risk-Aware Reinforcement Learning Trading Bot
+# 🛡️ Risk-Aware Reinforcement Learning for VN30 Portfolio Allocation
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Gymnasium](https://img.shields.io/badge/Gymnasium-v0.29-brightgreen.svg)](https://gymnasium.farama.org/)

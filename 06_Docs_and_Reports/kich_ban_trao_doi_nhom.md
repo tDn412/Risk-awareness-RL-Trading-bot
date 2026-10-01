@@ -1,5 +1,4 @@
-# BỘ KỊCH BẢN TRAO ĐỔI & THẢO LUẬN NHÓM TRÊN HỆ THỐNG
-## Kênh thảo luận: INT3011E - RISK-AWARE RL (Nhóm Antigravity)
+## Kênh thảo luận: INT3011E - RISK-AWARE RL FOR VN30 PORTFOLIO ALLOCATION
 **Chủ đề:** Xây dựng bài toán nghiên cứu giữa kỳ (Problem Formulation & Literature Review)  
 **Mục tiêu:** Tạo chuỗi thảo luận học thuật chất lượng cao (Conversation Length & Depth), thể hiện tinh thần làm việc nhóm, tư duy phản biện và năng lực nghiên cứu khoa học.
 

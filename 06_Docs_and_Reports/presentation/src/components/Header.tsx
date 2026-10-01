@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
             fontWeight: 500,
           }}
         >
-          VN30 Portfolio RL • Antigravity
+          VN30 Portfolio Allocation • Risk-Aware RL
         </span>
       </div>
     </div>

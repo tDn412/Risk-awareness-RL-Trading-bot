@@ -1,6 +1,6 @@
 # Literature Review: Risk-Aware Reinforcement Learning in Algorithmic Trading
 
-**Project:** Antigravity – Risk-Aware Reinforcement Learning Trading Bot  
+**Project:** Risk-Aware Reinforcement Learning for VN30 Portfolio Allocation  
 **Field:** Computational Intelligence & Quantitative Finance  
 
 ---
@@ -57,9 +57,9 @@ Recent empirical literature demonstrates that price-only representations suffer 
 
 ---
 
-## 5. Summary & Research Gap Addressed by Antigravity
+## 5. Summary & Research Gap Addressed
 
-While modern studies often test RL models on idealized frictionless environments, **Antigravity** bridges theoretical formulation and practical execution by:
+While modern studies often test RL models on idealized frictionless environments, our framework bridges theoretical formulation and practical execution by:
 1. Formulating and benchmarking **three distinct risk-aware reward functions** (Differential Sharpe, Sortino downside penalty, and Prospect Theory utility) against standard unconstrained return.
 2. Modeling realistic **transaction costs, bid-ask spread, and slippage**.
 3. Providing an **ablation study** quantifying the exact contribution of each risk component and multimodal sentiment inputs.

@@ -82,37 +82,19 @@ export const SlideTitle: React.FC = () => {
       <div
         style={{
           display: "flex",
-          gap: 32,
+          alignItems: "center",
           background: "rgba(15, 23, 42, 0.7)",
           border: "1px solid rgba(255, 255, 255, 0.12)",
-          padding: "20px 40px",
+          padding: "16px 48px",
           borderRadius: 16,
         }}
       >
-        <div style={{ textAlign: "left" }}>
-          <div style={{ fontSize: 13, color: "#64748B", textTransform: "uppercase", fontWeight: 700 }}>
-            Nhóm Nghiên Cứu
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 13, color: "#94A3B8", textTransform: "uppercase", fontWeight: 700, letterSpacing: 1.5 }}>
+            Thực hiện
           </div>
-          <div style={{ fontSize: 18, color: "#F8FAFC", fontWeight: 700, marginTop: 4 }}>
-            Antigravity Team
-          </div>
-        </div>
-        <div style={{ width: 1, background: "rgba(255, 255, 255, 0.1)" }} />
-        <div style={{ textAlign: "left" }}>
-          <div style={{ fontSize: 13, color: "#64748B", textTransform: "uppercase", fontWeight: 700 }}>
-            Thành viên
-          </div>
-          <div style={{ fontSize: 18, color: "#F8FAFC", fontWeight: 700, marginTop: 4 }}>
-            Như Đình Tú • Nguyễn Văn Mạnh
-          </div>
-        </div>
-        <div style={{ width: 1, background: "rgba(255, 255, 255, 0.1)" }} />
-        <div style={{ textAlign: "left" }}>
-          <div style={{ fontSize: 13, color: "#64748B", textTransform: "uppercase", fontWeight: 700 }}>
-            Hạn nộp
-          </div>
-          <div style={{ fontSize: 18, color: "#38BDF8", fontWeight: 700, marginTop: 4 }}>
-            02/10/2026
+          <div style={{ fontSize: 22, color: "#38BDF8", fontWeight: 700, marginTop: 4 }}>
+            Chúng tôi
           </div>
         </div>
       </div>

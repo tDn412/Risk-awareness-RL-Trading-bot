@@ -1,4 +1,4 @@
-# Project Charter: Antigravity – Risk-Aware Reinforcement Learning Trading Bot
+# Project Charter: Risk-Aware Reinforcement Learning for VN30 Portfolio Allocation
 
 **Author:** Quantitative Reinforcement Learning Research Team  
 **Domain:** Computer Science / Computational Finance / Artificial Intelligence  
@@ -14,7 +14,7 @@ Traditional Reinforcement Learning (RL) agents applied to algorithmic financial 
 2. **Policy Overfitting:** Exploiting historical anomalies that fail out-of-sample.
 3. **Execution Churn:** Excessive trading frequency leading to catastrophic transaction cost slippage.
 
-**Project Antigravity** addresses these limitations by engineering a **Risk-Aware Reinforcement Learning Framework** incorporating:
+Our proposed project addresses these limitations by engineering a **Risk-Aware Reinforcement Learning Framework** incorporating:
 - **Risk-Aware Reward Shaping:** Formulating objective functions grounded in modern portfolio theory and behavioral economics (Differential Sharpe Ratio, Sortino downside penalty, Drawdown barrier penalty, and Kahneman & Tversky's Prospect Theory).
 - **Multimodal State Representation:** Integrating technical market indicators (momentum, volatility, trend) with real-time sentiment signals.
 - **Robust Out-of-Sample Verification:** Benchmarking against unconstrained RL, Buy & Hold, and traditional quantitative baseline strategies across bull, bear, and high-volatility sideways regimes.

@@ -1,9 +1,8 @@
 # BÁO CÁO GIỮA KỲ: XÂY DỰNG BÀI TOÁN NGHIÊN CỨU ĐỀ TÀI
 ## Đề tài: Risk-Aware Reinforcement Learning for VN30 Portfolio Allocation
 
-- **Mã học phần:** INT3011E / Đồ án Kỹ thuật & Khởi nghiệp Công nghệ
-- **Nhóm thực hiện:** Nhóm nghiên cứu Antigravity (Thành viên: Như Đình Tú, Nguyễn Văn Mạnh, và cộng sự)
-- **Thời hạn nộp:** 02/10/2026
+- **Học phần:** INT3011E
+- **Thực hiện:** Chúng tôi
 - **Kho lưu trữ mã nguồn:** `Risk-awareness RL Trading bot`
 
 ---
@@ -121,7 +120,7 @@ Cách tiếp cận này bộc lộ các vấn đề kỹ thuật nghiêm trọng
 
 ### 2.4 Bảng tổng hợp đối sánh và Khoảng trống cốt lõi (Core Research Gap)
 
-| Tiêu chí so sánh | Bài báo lý thuyết (Moody, Jiang, Wang) | Sáng chế kỹ thuật (BlackRock, DeepMind) | Sản phẩm thực tế (FinRL, Qlib, Composer) | **Giải pháp đề xuất: Antigravity Risk-Aware RL** |
+| Tiêu chí so sánh | Bài báo lý thuyết (Moody, Jiang, Wang) | Sáng chế kỹ thuật (BlackRock, DeepMind) | Sản phẩm thực tế (FinRL, Qlib, Composer) | **Giải pháp chúng tôi đề xuất: Risk-Aware RL** |
 | :--- | :--- | :--- | :--- | :--- |
 | **Mục tiêu tối ưu** | Tối đa lợi nhuận hoặc Sharpe đối xứng | Tối ưu hóa lồi tĩnh / Khớp lệnh vi mô | Heuristic rules / Lợi nhuận thuần túy | **Hàm thưởng nhận thức rủi ro đa mục tiêu (Sortino, Drawdown Barrier, Prospect Theory)** |
 | **Không gian hành động** | Đơn tài sản hoặc tỷ trọng không ràng buộc | Rời rạc hoặc không kiểm soát ma sát | Quy tắc cố định theo bước | **Vector tỷ trọng liên tục trên simplex ($\sum w_i = 1$) qua Softmax Policy** |
@@ -139,7 +138,7 @@ Cách tiếp cận này bộc lộ các vấn đề kỹ thuật nghiêm trọng
 
 ## 3. XÂY DỰNG CÂU HỎI NGHIÊN CỨU (RESEARCH QUESTIONS)
 
-Nhóm xác định 03 câu hỏi nghiên cứu kỹ thuật trọng tâm:
+Chúng tôi xác định 03 câu hỏi nghiên cứu kỹ thuật trọng tâm:
 
 - **Câu hỏi 1 (Về Thiết kế Hàm thưởng Nhận thức Rủi ro trên Simplex):**
   Làm thế nào để thiết kế và tối ưu hóa hàm thưởng nhận thức rủi ro (kết hợp Sortino downside semi-variance, Drawdown Barrier Penalty và Prospect Theory) giúp tác tử RL phân bổ tỷ trọng trên simplex ($\sum w_i = 1, w_i \ge 0$) kiềm chế mức sụt giảm tài sản tối đa (Max Drawdown $\le 15\%$) trên rổ VN30 mà vẫn bảo toàn tỷ suất sinh lời vượt trội so với VN30-Index?
@@ -188,4 +187,4 @@ Xây dựng, huấn luyện và kiểm định thực nghiệm một hệ thốn
      - Biểu đồ diện tích xếp chồng (Stacked Area Chart) thể hiện biến động phân bổ tỷ trọng cổ phiếu và tiền mặt theo thời gian.
      - Biểu đồ sụt giảm vốn tức thời (Underwater Drawdown Chart).
      - Bảng so sánh các chỉ số thống kê định lượng theo thời gian thực.
-   - Đóng gói mã nguồn có unit test và hoàn thành tài liệu báo cáo kỹ thuật trước hạn chót **02/10/2026**.
+   - Đóng gói mã nguồn có unit test và hoàn thiện toàn bộ tài liệu báo cáo kỹ thuật đề tài.

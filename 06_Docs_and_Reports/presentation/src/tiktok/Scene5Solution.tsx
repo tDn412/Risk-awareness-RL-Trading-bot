@@ -72,7 +72,7 @@ export const Scene5Solution: React.FC = () => {
             textTransform: "uppercase",
           }}
         >
-          GIẢI PHÁP ĐỀ TÀI ANTIGRAVITY
+          GIẢI PHÁP CHÚNG TÔI ĐỀ XUẤT
         </span>
       </div>
 
