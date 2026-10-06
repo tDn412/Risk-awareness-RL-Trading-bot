@@ -43,10 +43,15 @@ MANIFEST
 *.swo
 
 # Project Data and Model Checkpoints
-data/*.csv
-data/*.parquet
 data/raw/*
+!data/raw/**/.gitkeep
 data/processed/*
+!data/processed/**/.gitkeep
+data/archive/*
+outputs/checkpoints/*
+!outputs/checkpoints/.gitkeep
+outputs/logs/*
+!outputs/logs/.gitkeep
 models/checkpoints/
 *.pth
 *.pt

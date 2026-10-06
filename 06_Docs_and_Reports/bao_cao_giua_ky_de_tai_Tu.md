@@ -2,7 +2,6 @@
 ## Đề tài: Risk-Aware Reinforcement Learning for VN30 Portfolio Allocation
 
 - **Học phần:** INT3011E
-- **Thực hiện:** Chúng tôi
 - **Kho lưu trữ mã nguồn:** `Risk-awareness RL Trading bot`
 
 ---

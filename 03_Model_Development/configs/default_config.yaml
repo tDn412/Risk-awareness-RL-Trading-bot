@@ -1,0 +1,109 @@
+# Default Experiment Configuration
+# Based on INT3011E Midterm Report: Risk-Aware Reinforcement Learning for VN30 Portfolio Allocation
+
+project:
+  name: "Risk-Aware RL VN30"
+  course: "INT3011E"
+  group: "INT3011E 2 _ Risk - aware RL"
+  base_currency: "VND"
+  initial_capital: 100_000_000.0  # 100 million VND
+
+universe:
+  benchmark_index: "VN30"
+  tickers:
+    - "ACB"
+    - "BCM"
+    - "BID"
+    - "BVH"
+    - "CTG"
+    - "FPT"
+    - "GAS"
+    - "GVR"
+    - "HDB"
+    - "HPG"
+    - "MBB"
+    - "MSN"
+    - "MWG"
+    - "PLX"
+    - "POW"
+    - "SAB"
+    - "SHB"
+    - "SSB"
+    - "SSI"
+    - "STB"
+    - "TCB"
+    - "TPB"
+    - "VCB"
+    - "VHM"
+    - "VIB"
+    - "VIC"
+    - "VJC"
+    - "VNM"
+    - "VPB"
+    - "VRE"
+
+market_rules:
+  hose_price_limit_pct: 0.07       # +/- 7% daily price band
+  lot_size: 100                     # HOSE standard round lot
+  brokerage_fee_rate: 0.0015        # 0.15% per trade (buy & sell)
+  selling_tax_rate: 0.001           # 0.1% personal income tax on sell value
+  settlement_cycle: "T+2"           # T+2 (or T+1.5 post-2022-08-29)
+
+simulation_levels:
+  M0: "Frictionless baseline, flat fee, full fill at next close"
+  M1: "Realistic constraints: T+2, lot 100, price band +/-7%, tax 0.1%, fee 0.15%"
+  M2: "Adverse scenario: increased slippage, volume participation limit, partial/rejected fills"
+
+reward_configurations:
+  A0:
+    name: "Base NAV Log Return"
+    lambda_downside: 0.0
+    eta_drawdown: 0.0
+  A1:
+    name: "Downside Return Penalty"
+    lambda_downside: 2.0
+    eta_drawdown: 0.0
+    min_daily_return: 0.0           # threshold m
+  A2:
+    name: "Drawdown Barrier Penalty"
+    lambda_downside: 0.0
+    eta_drawdown: 5.0
+    drawdown_threshold: 0.15        # threshold d* (15% from peak)
+  A3:
+    name: "Combined Risk-Aware Reward"
+    lambda_downside: 2.0
+    eta_drawdown: 5.0
+    min_daily_return: 0.0           # threshold m
+    drawdown_threshold: 0.15        # threshold d* (15% from peak)
+
+rolling_windows:
+  window_1:
+    train: ["2018-01-01", "2020-12-31"]
+    val:   ["2021-01-01", "2021-12-31"]
+    test:  ["2022-01-01", "2022-12-31"]
+  window_2:
+    train: ["2018-01-01", "2021-12-31"]
+    val:   ["2022-01-01", "2022-12-31"]
+    test:  ["2023-01-01", "2023-12-31"]
+  window_3:
+    train: ["2018-01-01", "2022-12-31"]
+    val:   ["2023-01-01", "2023-12-31"]
+    test:  ["2024-01-01", "2024-12-31"]
+  window_4:
+    train: ["2018-01-01", "2023-12-31"]
+    val:   ["2024-01-01", "2024-12-31"]
+    test:  ["2025-01-01", "2025-12-31"]
+
+experiment_protocol:
+  random_seeds: [42, 101, 2024, 777, 999]
+  total_main_runs: 80               # 4 configs * 4 windows * 5 seeds on M1
+  ppo:
+    learning_rate: 0.0003
+    n_steps: 2048
+    batch_size: 64
+    n_epochs: 10
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_range: 0.2
+    ent_coef: 0.01
+    total_timesteps: 150_000
