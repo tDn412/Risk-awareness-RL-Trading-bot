@@ -48,3 +48,42 @@ PREVENTION: Documented exchange-transfer transition threshold in clean_alignment
 ---
 
 <!-- Add new incidents below this line -->
+
+## Incident #4
+
+```
+DATE: 2026-10-22
+TASK: Set up Python environment and run VN30 data pipeline
+LAYER FAILED: Infrastructure / Data Collector
+SYMPTOM: pip: "No matching distribution found for vnstock>=4.0.0"; installing vnstock from GitHub then fails on "No matching distribution found for vnai>=2.6.0" (both return 404 on PyPI).
+ROOT CAUSE: vnstock and its mandatory dependency vnai are no longer published on PyPI; vnstock/__init__.py imports vnai unconditionally.
+FIX APPLIED: Added 02_Data_Pipeline/collectors/vci_client.py, a direct client for the same Vietcap endpoint vnstock uses (trading.vietcap.com.vn/api/chart/OHLCChart/gap-chart). fetch_vn30_prices.py and fetch_benchmarks.py fall back to it when vnstock cannot be imported. Corporate events (vnstock-only) skipped; VCI prices are already split/dividend adjusted.
+TEST ADDED: none (network client); pipeline run verified 30 tickers x 1,999 days written to data/processed/.
+PREVENTION: Remove vnstock from requirements.txt or pin a GitHub install once vnai is available again; keep VCI fallback.
+```
+
+## Incident #5
+
+```
+DATE: 2026-10-22
+TASK: Run full pytest suite after adding training tests
+LAYER FAILED: Infrastructure (Windows)
+SYMPTOM: OSError: [WinError 1114] A dynamic link library (DLL) initialization routine failed — while importing torch during test collection.
+ROOT CAUSE: On Windows, torch DLLs fail to initialise if pandas/pyarrow native libs are loaded first in the same process.
+FIX APPLIED: tests/conftest.py imports torch before any other module.
+TEST ADDED: tests/test_train.py (exercises torch import after env/pandas tests).
+PREVENTION: Keep the torch import at the top of conftest.py; train.py imports torch before pandas-dependent modules.
+```
+
+## Incident #6
+
+```
+DATE: 2026-10-22
+TASK: Run existing test suite on fresh environment
+LAYER FAILED: Processor (test)
+SYMPTOM: tests/test_clean_alignment.py::test_output_schema — assert StringDtype == object (pandas 3.0 default 'str' dtype).
+ROOT CAUSE: requirements.txt allows pandas>=2.0; pandas 3 infers a dedicated string dtype for text columns.
+FIX APPLIED: Assertion uses pd.api.types.is_string_dtype(), valid on pandas 2 and 3.
+TEST ADDED: existing test fixed.
+PREVENTION: Prefer pandas type predicates over dtype equality in tests.
+```
