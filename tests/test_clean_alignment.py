@@ -88,7 +88,7 @@ def test_output_schema(sample_calendar: pd.DatetimeIndex) -> None:
     assert list(aligned.columns) == expected_cols
 
     assert pd.api.types.is_datetime64_ns_dtype(aligned["date"]) or pd.api.types.is_datetime64_any_dtype(aligned["date"])
-    assert aligned["ticker"].dtype == object or str(aligned["ticker"].dtype) == "string"
+    assert pd.api.types.is_string_dtype(aligned["ticker"])
     assert aligned["close"].dtype == np.float64
     assert aligned["volume"].dtype == np.int64
     assert aligned["adj_factor"].dtype == np.float64

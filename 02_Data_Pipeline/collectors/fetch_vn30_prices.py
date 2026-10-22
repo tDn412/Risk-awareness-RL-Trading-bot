@@ -22,6 +22,11 @@ try:
 except ImportError:
     Quote = None
 
+try:
+    from collectors.vci_client import fetch_vci_daily_ohlcv
+except ImportError:  # executed as a standalone script from collectors/
+    from vci_client import fetch_vci_daily_ohlcv  # type: ignore[no-redef]
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -59,13 +64,14 @@ def fetch_single_ticker_price(
     Returns:
         Cleaned pandas DataFrame or None if failed.
     """
-    if Quote is None:
-        raise ImportError("vnstock library is not installed. Run: pip install vnstock")
 
     for attempt in range(1, max_retries + 1):
         try:
-            q = Quote(symbol=ticker, source=source)
-            df = q.history(start=start_date, end=end_date, interval="1D")
+            if Quote is not None:
+                q = Quote(symbol=ticker, source=source)
+                df = q.history(start=start_date, end=end_date, interval="1D")
+            else:
+                df = fetch_vci_daily_ohlcv(ticker, start_date, end_date)
 
             if df is None or df.empty:
                 logger.warning(f"[{ticker}] No data returned on attempt {attempt}.")
