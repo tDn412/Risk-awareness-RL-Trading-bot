@@ -32,6 +32,19 @@ TEST ADDED: test_skip_existing() — mocks API, verifies no second call when fil
 PREVENTION: Rate limit documented in AGENTS.md §1 and Collector DoD §6.1
 ```
 
+## Incident #3
+
+```
+DATE: 2026-10-14
+TASK: Align 30 VN30 tickers to common trading calendar (Phase 1 clean_alignment)
+LAYER FAILED: Data Processor
+SYMPTOM: ValueError: Ticker BCM exceeds max gap limit (5 days): detected gap of 7 days between 2020-08-20 and 2020-08-28.
+ROOT CAUSE: Structural UBCKNN exchange-transfer halts (UPCoM to HOSE) created valid trading halts of 6-9 days (POW 9d, BCM 7d, VIB 7d, GVR 6d) during official listing transitions.
+FIX APPLIED: Configured MAX_ALLOWED_GAP_DAYS = 10 to accommodate legitimate exchange transfers while guarding against gaps > 10 days; implemented is_listed mask for late-listed stocks (SSB, TCB).
+TEST ADDED: test_pre_listing_not_ffilled(), test_gap_ffill_short(), test_gap_raises_long() in tests/test_clean_alignment.py.
+PREVENTION: Documented exchange-transfer transition threshold in clean_alignment.py and roadmap.
+```
+
 ---
 
 <!-- Add new incidents below this line -->

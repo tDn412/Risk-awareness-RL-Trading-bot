@@ -10,7 +10,7 @@ Provides standard and risk-adjusted metrics:
 - Win Rate, Profit Factor
 """
 
-from typing import Dict, Union
+from typing import Any, Dict, Union
 import numpy as np
 import pandas as pd
 
@@ -23,8 +23,8 @@ def compute_drawdown(equity_series: pd.Series) -> pd.Series:
 
 
 def evaluate_portfolio(
-    returns_series: Union[pd.Series, np.ndarray],
-    equity_series: Union[pd.Series, np.ndarray],
+    returns_series: Union[pd.Series, np.ndarray[Any, Any]],
+    equity_series: Union[pd.Series, np.ndarray[Any, Any]],
     risk_free_rate: float = 0.02,
     annual_trading_days: int = 252
 ) -> Dict[str, float]:
@@ -40,9 +40,9 @@ def evaluate_portfolio(
     Returns:
         Dictionary of formatted quantitative performance metrics.
     """
-    if isinstance(returns_series, np.ndarray):
+    if not isinstance(returns_series, pd.Series):
         returns_series = pd.Series(returns_series)
-    if isinstance(equity_series, np.ndarray):
+    if not isinstance(equity_series, pd.Series):
         equity_series = pd.Series(equity_series)
 
     # Clean data
@@ -51,7 +51,7 @@ def evaluate_portfolio(
 
     total_periods = len(returns_series)
     if total_periods < 2:
-        return {"error": "Insufficient data"}
+        raise ValueError("Insufficient data: at least 2 periods required")
 
     initial_value = float(equity_series.iloc[0])
     final_value = float(equity_series.iloc[-1])

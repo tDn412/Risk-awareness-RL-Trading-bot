@@ -83,6 +83,9 @@ Risk-awareness RL Trading bot/
 │   ├── test_environment.py            # Kiểm thử tính tuân thủ Gymnasium API
 │   └── test_rewards.py                # Kiểm thử độ nhạy và thang đo của 4 hàm thưởng
 │
+├── SOURCE_OF_TRUTH.md                 # Single Source of Truth chuẩn tối cao của toàn dự án
+├── AGENTS.md                          # Quy chuẩn vận hành và tiêu chí DoD cho AI Agents
+├── DIRECTORY_STRUCTURE.md             # Bản đồ kiến trúc thư mục
 ├── README.md                          # Tài liệu hướng dẫn chung của toàn bộ dự án
 └── requirements.txt                   # Danh mục thư viện Python bắt buộc
 ```

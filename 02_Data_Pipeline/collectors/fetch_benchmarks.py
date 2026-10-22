@@ -37,7 +37,7 @@ def fetch_benchmark_indices(
     output_dir: str = "data/raw/benchmarks",
     source: str = "VCI",
     delay_between_requests: float = 1.0
-) -> dict:
+) -> dict[str, pd.DataFrame]:
     """
     Fetch daily benchmark index history and save each as CSV.
 

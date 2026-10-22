@@ -1,0 +1,92 @@
+% ==============================================================================
+% Preamble Configuration for Risk-Aware RL Beamer Presentation (INT3011E)
+% ==============================================================================
+
+\usepackage[utf8]{inputenc}
+\usepackage[vietnamese]{babel}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{booktabs}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds}
+
+% --- Custom Corporate & Academic Quant Color Palette ---
+\definecolor{MainNavy}{RGB}{14, 34, 61}        % Primary Header & Strong emphasis
+\definecolor{SecondaryNavy}{RGB}{28, 64, 110}  % Block titles
+\definecolor{AccentCyan}{RGB}{2, 132, 199}      % Highlighting and links
+\definecolor{AlertCrimson}{RGB}{220, 38, 38}   % Risk / Drawdown / Pain points
+\definecolor{SuccessGreen}{RGB}{22, 163, 74}    % Overperformance / Solved
+\definecolor{BgSoftGray}{RGB}{248, 250, 252}    % Subtle block background
+\definecolor{BorderGray}{RGB}{226, 232, 240}    % Card borders
+\definecolor{DarkText}{RGB}{30, 41, 59}         % Text color
+
+% --- Theme Customization ---
+\usetheme{Madrid}
+\usecolortheme{whale}
+
+% Beamer element color adjustments
+\setbeamercolor{palette primary}{bg=MainNavy, fg=white}
+\setbeamercolor{palette secondary}{bg=SecondaryNavy, fg=white}
+\setbeamercolor{palette tertiary}{bg=AccentCyan, fg=white}
+\setbeamercolor{title}{bg=MainNavy, fg=white}
+\setbeamercolor{frametitle}{bg=MainNavy, fg=white}
+\setbeamercolor{structure}{fg=SecondaryNavy}
+\setbeamercolor{normal text}{fg=DarkText}
+
+% Block Colors
+\setbeamercolor{block title}{bg=SecondaryNavy, fg=white}
+\setbeamercolor{block body}{bg=BgSoftGray, fg=DarkText}
+
+\setbeamercolor{block title alerted}{bg=AlertCrimson, fg=white}
+\setbeamercolor{block body alerted}{bg=AlertCrimson!5, fg=DarkText}
+
+\setbeamercolor{block title example}{bg=SuccessGreen, fg=white}
+\setbeamercolor{block body example}{bg=SuccessGreen!5, fg=DarkText}
+
+% Remove default navigation symbols
+\setbeamertemplate{navigation symbols}{}
+
+% Clean and professional footline
+\setbeamertemplate{footline}{
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.6\paperwidth,ht=2.4ex,dp=1ex,left,leftskip=1.2em]{palette primary}%
+      \textbf{Báo Cáo Đề Tài:} Risk-Aware RL cho Danh Mục VN30
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.4\paperwidth,ht=2.4ex,dp=1ex,right,rightskip=1.2em]{palette primary}%
+      Trang \insertframenumber{} / \inserttotalframenumber
+    \end{beamercolorbox}%
+  }%
+  \vskip0pt%
+}
+
+% Itemize bullet styling
+\setbeamertemplate{itemize item}{\color{AccentCyan}$\blacktriangleright$}
+\setbeamertemplate{itemize subitem}{\color{SecondaryNavy}$\bullet$}
+\setbeamertemplate{enumerate item}{{\color{SecondaryNavy}\textbf{\insertenumlabel.}}}
+
+% Custom Macro Boxes
+\newcommand{\alertcard}[2]{
+  \begin{alertblock}{#1}
+    #2
+  \end{alertblock}
+}
+
+\newcommand{\successcard}[2]{
+  \begin{exampleblock}{#1}
+    #2
+  \end{exampleblock}
+}
+
+\newcommand{\kpicard}[3]{
+  \begin{block}{#1}
+    \centering
+    {\Large \color{AccentCyan}\textbf{#2}}\\[0.2ex]
+    {\footnotesize \color{DarkText}#3}
+  \end{block}
+}

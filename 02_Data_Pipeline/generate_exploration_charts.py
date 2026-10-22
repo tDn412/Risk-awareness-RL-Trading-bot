@@ -10,6 +10,7 @@ import os
 import sys
 import glob
 import json
+from typing import Any, Optional, Tuple, Dict
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -25,7 +26,7 @@ FIGURES_DIR = "outputs/figures"
 os.makedirs(FIGURES_DIR, exist_ok=True)
 
 
-def load_all_data():
+def load_all_data() -> Tuple[Dict[str, pd.DataFrame], Optional[pd.DataFrame], Optional[pd.DataFrame], pd.DataFrame]:
     """Load all 30 tickers, benchmarks, and corporate events."""
     price_files = sorted(glob.glob("data/raw/prices/*.csv"))
     tickers_data = {}
@@ -55,7 +56,7 @@ def load_all_data():
     return tickers_data, vn30_df, vnindex_df, events_df
 
 
-def build_price_matrices(tickers_data):
+def build_price_matrices(tickers_data: Dict[str, pd.DataFrame]) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Build aligned Close price and Volume matrix DataFrames."""
     close_dict = {}
     volume_dict = {}
@@ -68,7 +69,7 @@ def build_price_matrices(tickers_data):
     return df_close, df_volume
 
 
-def plot_price_trajectories(df_close, vn30_df):
+def plot_price_trajectories(df_close: pd.DataFrame, vn30_df: Optional[pd.DataFrame]) -> None:
     """Plot 1: Normalized Price Trajectories & Macro Regimes."""
     fig, ax = plt.subplots(figsize=(14, 7), dpi=300)
     
@@ -105,7 +106,7 @@ def plot_price_trajectories(df_close, vn30_df):
     print(f"[+] Saved: {out_file}")
 
 
-def plot_correlation_heatmap(df_close):
+def plot_correlation_heatmap(df_close: pd.DataFrame) -> None:
     """Plot 2: Cross-Asset Daily Return Correlation Heatmap."""
     df_ret = df_close.pct_change().dropna(how="all")
     corr = df_ret.corr()
@@ -135,7 +136,7 @@ def plot_correlation_heatmap(df_close):
     print(f"[+] Saved: {out_file}")
 
 
-def plot_return_fat_tails(df_close):
+def plot_return_fat_tails(df_close: pd.DataFrame) -> None:
     """Plot 3: Non-Normality & Empirical Fat Tails vs Gaussian."""
     df_ret = df_close.pct_change().dropna()
     all_returns = df_ret.values.flatten()
@@ -190,7 +191,7 @@ def plot_return_fat_tails(df_close):
     print(f"[+] Saved: {out_file}")
 
 
-def plot_liquidity_profile(df_volume, df_close):
+def plot_liquidity_profile(df_volume: pd.DataFrame, df_close: pd.DataFrame) -> None:
     """Plot 4: Average Daily Trading Volume & Liquidity Profile."""
     adv = df_volume.mean().sort_values(ascending=False)
     adv_shares_m = adv / 1_000_000.0  # Million shares
@@ -220,7 +221,7 @@ def plot_liquidity_profile(df_volume, df_close):
     print(f"[+] Saved: {out_file}")
 
 
-def plot_corporate_actions(events_df):
+def plot_corporate_actions(events_df: pd.DataFrame) -> None:
     """Plot 5: Breakdown of Corporate Actions (Dividends & Splits 2018–2025)."""
     if events_df.empty:
         print("[-] No events data to plot.")
@@ -261,7 +262,7 @@ def plot_corporate_actions(events_df):
     print(f"[+] Saved: {out_file}")
 
 
-def plot_underwater_drawdown(vn30_df):
+def plot_underwater_drawdown(vn30_df: Optional[pd.DataFrame]) -> None:
     """Plot 6: VN30-Index Underwater Drawdown & Barrier Threshold d*."""
     if vn30_df is None:
         return
@@ -304,7 +305,7 @@ def plot_underwater_drawdown(vn30_df):
     print(f"[+] Saved: {out_file}")
 
 
-def build_jupyter_notebook():
+def build_jupyter_notebook() -> None:
     """Generates an executable Jupyter Notebook summarizing the findings."""
     notebook_dict = {
         "cells": [
@@ -368,7 +369,7 @@ def build_jupyter_notebook():
                     "- **Tháng 03/2020:** Sụt giảm **-33.8%**.\n",
                     "- **Năm 2022:** Sụt giảm tới **-45.2%**.\n",
                     "\n",
-                    "> **Ý nghĩa đối với đề tài:** Các mô hình RL tối ưu hàm thưởng lợi suất truyền thống ($A_0$) thường tiếp tục nắm giữ cổ phiếu khi thị trường rơi tự do. Việc đưa rào cản phạt sụt giảm vượt ngưỡng $d^* = 15\%$ trong hàm thưởng $A_2$ và $A_3$ đóng vai trò cảnh báo tác tử rút bớt vốn về tiền mặt ($w_{\\text{cash}} \\to 1.0$)."
+                    "> **Ý nghĩa đối với đề tài:** Các mô hình RL tối ưu hàm thưởng lợi suất truyền thống ($A_0$) thường tiếp tục nắm giữ cổ phiếu khi thị trường rơi tự do. Việc đưa rào cản phạt sụt giảm vượt ngưỡng $d^* = 15%$ trong hàm thưởng $A_2$ và $A_3$ đóng vai trò cảnh báo tác tử rút bớt vốn về tiền mặt ($w_{\\text{cash}} \\to 1.0$)."
                 ]
             },
             {
@@ -458,7 +459,7 @@ def build_jupyter_notebook():
     print(f"[+] Saved Jupyter Notebook: {nb_path}")
 
 
-def main():
+def main() -> None:
     print("[*] Loading raw collected data...")
     tickers_data, vn30_df, vnindex_df, events_df = load_all_data()
     print(f"[*] Loaded {len(tickers_data)} tickers. Benchmarks present: VN30={vn30_df is not None}, VNINDEX={vnindex_df is not None}")

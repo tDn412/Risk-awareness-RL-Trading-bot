@@ -11,6 +11,7 @@ import argparse
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
+from typing import Optional
 
 try:
     import yfinance as yf
@@ -28,7 +29,7 @@ def compute_rsi(series: pd.Series, period: int = 14) -> pd.Series:
     return rsi.fillna(50.0)
 
 
-def compute_macd(series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9):
+def compute_macd(series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> tuple[pd.Series, pd.Series, pd.Series]:
     """Calculate MACD line, signal line, and histogram."""
     exp1 = series.ewm(span=fast, adjust=False).mean()
     exp2 = series.ewm(span=slow, adjust=False).mean()
@@ -38,7 +39,7 @@ def compute_macd(series: pd.Series, fast: int = 12, slow: int = 26, signal: int 
     return macd_line, signal_line, hist
 
 
-def compute_bollinger_bands(series: pd.Series, window: int = 20, num_std: float = 2.0):
+def compute_bollinger_bands(series: pd.Series, window: int = 20, num_std: float = 2.0) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
     """Calculate Bollinger Bands and %B position."""
     sma = series.rolling(window=window).mean()
     std = series.rolling(window=window).std()
@@ -90,7 +91,7 @@ def generate_synthetic_data(days: int = 1000, start_price: float = 100.0) -> pd.
     return df
 
 
-def fetch_market_data(symbol: str, start: str = None, end: str = None, fallback_on_fail: bool = True) -> pd.DataFrame:
+def fetch_market_data(symbol: str, start: Optional[str] = None, end: Optional[str] = None, fallback_on_fail: bool = True) -> pd.DataFrame:
     """Download OHLCV data from Yahoo Finance, falling back gracefully if needed."""
     print(f"[*] Fetching market data for: {symbol} (from {start} to {end})...")
     df = None
@@ -164,7 +165,7 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def export_pipeline(symbol: str, output_dir: str = "data/processed", start: str = "2020-01-01", end: str = None) -> str:
+def export_pipeline(symbol: str, output_dir: str = "data/processed", start: str = "2020-01-01", end: Optional[str] = None) -> str:
     """End-to-end data pipeline execution and export."""
     os.makedirs(output_dir, exist_ok=True)
     clean_sym = symbol.replace("^", "").replace("-", "_").replace(".", "_")

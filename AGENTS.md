@@ -1,7 +1,7 @@
 # AGENTS.md — Risk-Aware RL Trading Bot
 
 > **For every AI agent (and human contributor) working on this codebase.**  
-> Read this file first. It is the single source of truth for architecture, conventions, and completion criteria.
+> Read this file along with [SOURCE_OF_TRUTH.md](file:///home/tu/Documents/Risk-awareness%20RL%20Trading%20bot/SOURCE_OF_TRUTH.md). Together they constitute the authoritative Single Source of Truth for architecture, conventions, and completion criteria.
 
 ---
 
@@ -76,12 +76,13 @@ Always use `skip_existing=True` pattern when downloading to avoid redundant call
 │   ├── processed/               # Output of processors/
 │   └── external/                # VN30 constituent lists, index weights
 ├── outputs/
-│   ├── models/                  # Saved SB3 .zip checkpoints
+│   ├── checkpoints/             # Saved SB3 .zip checkpoints
 │   ├── logs/                    # TensorBoard logs
 │   └── figures/                 # Generated plots
 ├── tests/                       # Mirrors source layout (test_*.py)
 ├── requirements.txt
-├── AGENTS.md                    # YOU ARE HERE
+├── AGENTS.md                    # Operational AI Agent Harness Guide
+├── SOURCE_OF_TRUTH.md           # Authoritative Single Source of Truth
 └── README.md
 ```
 
@@ -194,9 +195,11 @@ pytest tests/ -v \
 
 # 4. Environment sanity check (when env code changes)
 python -c "
+import sys, importlib
+sys.path.insert(0, '03_Model_Development')
 from gymnasium.utils.env_checker import check_env
-from 03_Model_Development.env.vn30_portfolio_env import VN30PortfolioEnv
-env = VN30PortfolioEnv()
+mod = importlib.import_module('env.vn30_portfolio_env')
+env = mod.VN30PortfolioEnv()
 check_env(env)
 print('OK: Env check passed')
 "
