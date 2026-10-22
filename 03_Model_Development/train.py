@@ -1,159 +1,224 @@
-"""
-Training Script for Risk-Aware RL Trading Agents
-Project: Antigravity - Risk-Aware Reinforcement Learning Trading Bot
+"""Training entrypoint for PPO / SAC agents on ``VN30PortfolioEnv``.
 
-Supports:
-- Stable-Baselines3 PPO / SAC
-- Multi-reward experiments ('standard', 'volatility_penalty', 'differential_sharpe', 'prospect_theory')
-- TensorBoard logging & checkpoint saving
+Example:
+    python 03_Model_Development/train.py --config ppo_baseline.yaml --reward A2 --seed 42
+    python 03_Model_Development/train.py --config ppo_baseline.yaml --dry-run
+
+Per run (``run_id = <agent>_<reward>_<window>_s<seed>_<timestamp>``) it writes:
+    outputs/models/<run_id>.zip       final checkpoint
+    outputs/models/<run_id>_best.zip  checkpoint with best validation reward
+    outputs/models/<run_id>.json      config snapshot + validation metrics
+    outputs/logs/<run_id>/            TensorBoard logs (incl. rollout/ep_rew_mean)
 """
 
-import os
+from __future__ import annotations
+
 import argparse
-import numpy as np
-import pandas as pd
+import json
+import logging
+import shutil
 import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-# Add subdirectories to sys.path
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-for sub in ["02_Data_Pipeline", "03_Model_Development", "04_Backtesting_Evaluation"]:
-    sub_path = os.path.join(PROJECT_ROOT, sub)
-    if sub_path not in sys.path:
-        sys.path.insert(0, sub_path)
+import torch
+import yaml
+from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.monitor import Monitor
 
-from env.trading_env import RiskAwareTradingEnv
-from data_collector import fetch_market_data, add_features
+MODEL_DIR_NAME = "03_Model_Development"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+for sub in (MODEL_DIR_NAME, "04_Backtesting_Evaluation"):
+    if str(REPO_ROOT / sub) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT / sub))
 
+from agents import AGENTS  # noqa: E402
+from env import RewardConfig, VN30PortfolioEnv, load_market_data, make_synthetic_market_data  # noqa: E402
+from env.market_data import FeatureScaler, MarketData  # noqa: E402
+from metrics import evaluate_portfolio  # noqa: E402
+from rollout import rollout  # noqa: E402
 
-def get_gym_env(df, reward_mode: str = "volatility_penalty"):
-    """Instantiate the environment with Gymnasium compatibility."""
-    try:
-        import gymnasium as gym
-        
-        class SB3TradingEnv(gym.Env):
-            def __init__(self, raw_env):
-                super().__init__()
-                self.raw_env = raw_env
-                self.observation_space = raw_env.observation_space
-                self.action_space = raw_env.action_space
+logger = logging.getLogger(__name__)
 
-            def reset(self, seed=None, options=None):
-                return self.raw_env.reset(seed=seed, options=options)
-
-            def step(self, action):
-                return self.raw_env.step(action)
-
-        raw = RiskAwareTradingEnv(df, reward_mode=reward_mode)
-        return SB3TradingEnv(raw)
-    except Exception:
-        return RiskAwareTradingEnv(df, reward_mode=reward_mode)
+CONFIG_DIR = REPO_ROOT / MODEL_DIR_NAME / "configs"
+MODELS_DIR = REPO_ROOT / "outputs" / "models"
+LOGS_DIR = REPO_ROOT / "outputs" / "logs"
+DRY_RUN_EVAL_FREQ = 500
+DRY_RUN_N_STEPS = 128
+DRY_RUN_SYNTHETIC_DAYS = 400
 
 
-def run_random_agent_benchmark(env, num_episodes: int = 1):
-    """Simple baseline test when SB3 is not yet installed."""
-    print("[*] Running Random/Heuristic Agent Baseline...")
-    for ep in range(num_episodes):
-        obs, info = env.reset()
-        terminated = truncated = False
-        total_reward = 0.0
-        steps = 0
-        while not (terminated or truncated):
-            # Target position random walk around 0.5 (slight long bias)
-            action = np.array([np.clip(np.random.normal(0.5, 0.3), 0.0, 1.0)], dtype=np.float32)
-            obs, reward, terminated, truncated, info = env.step(action)
-            total_reward += reward
-            steps += 1
-        print(f"[+] Episode {ep+1} Completed | Steps: {steps} | "
-              f"Final Portfolio: ${info['portfolio_value']:,.2f} | "
-              f"Max Drawdown: {info['drawdown']*100:.2f}% | "
-              f"Total Reward: {total_reward:.4f}")
+def load_config(name: str) -> dict[str, Any]:
+    """Load a YAML config by file name (looked up in ``configs/``) or path."""
+    path = Path(name)
+    if not path.exists():
+        path = CONFIG_DIR / name
+    with path.open(encoding="utf-8") as fh:
+        config: dict[str, Any] = yaml.safe_load(fh)
+    return config
 
 
-def train(args):
-    # 1. Load or Generate Dataset
-    data_path = args.data
-    if data_path and os.path.exists(data_path):
-        print(f"[*] Loading preprocessed data from {data_path}")
-        df = pd.read_csv(data_path, index_col=0)
+def build_env(
+    data: MarketData,
+    config: dict[str, Any],
+    reward: RewardConfig,
+    scaler: FeatureScaler,
+    full_period: bool,
+) -> VN30PortfolioEnv:
+    """Instantiate the env from the ``env`` config block."""
+    env_cfg = config["env"]
+    return VN30PortfolioEnv(
+        data,
+        reward_config=reward,
+        initial_cash=float(env_cfg["initial_cash"]),
+        softmax_temperature=float(env_cfg["softmax_temperature"]),
+        episode_length=None if full_period else int(env_cfg["episode_length"]),
+        risk_window=int(env_cfg["risk_window"]),
+        feature_scaler=scaler,
+    )
+
+
+def train(
+    config: dict[str, Any],
+    reward_mode: str,
+    seed: int,
+    window: str,
+    total_timesteps: int,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Train one agent and return the run summary (also written to JSON).
+
+    Args:
+        config: Parsed YAML config.
+        reward_mode: One of ``A0``–``A3``.
+        seed: Random seed.
+        window: Walk-forward window key, e.g. ``window_1``.
+        total_timesteps: Environment steps to train for.
+        dry_run: Use synthetic data and tiny rollouts; nothing is kept on disk.
+
+    Returns:
+        Run summary with paths and validation metrics.
+    """
+    train_cfg = config["training"]
+    torch.set_num_threads(int(train_cfg["torch_threads"]))
+    reward = RewardConfig(**{**config["reward"], "mode": reward_mode})
+    agent_name = str(config["agent"])
+
+    if dry_run:
+        full = make_synthetic_market_data(n_days=DRY_RUN_SYNTHETIC_DAYS, seed=seed)
+        split = full.dates[DRY_RUN_SYNTHETIC_DAYS * 3 // 4]
+        train_data = full.slice_dates(end=str(split.date()))
+        val_data = full.slice_dates(start=str(split.date()))
     else:
-        print(f"[*] Fetching dataset for symbol: {args.symbol}")
-        raw = fetch_market_data(args.symbol, start=args.start, end=args.end)
-        df = add_features(raw)
+        bounds = config["data"]["windows"][window]
+        full = load_market_data(REPO_ROOT / config["data"]["feature_matrix"])
+        train_data = full.slice_dates(*bounds["train"])
+        val_data = full.slice_dates(*bounds["val"])
+    scaler = train_data.fit_scaler()  # fitted on train only: no look-ahead into val/test
 
-    # 2. Train / Test Split (Time-series chronological split)
-    split_idx = int(len(df) * args.train_split)
-    df_train = df.iloc[:split_idx].copy()
-    df_test = df.iloc[split_idx:].copy()
-    print(f"[+] Dataset Split -> Train: {len(df_train)} candles | Test: {len(df_test)} candles")
+    n_envs = int(train_cfg["n_envs"])
+    vec_env = make_vec_env(
+        lambda: Monitor(build_env(train_data, config, reward, scaler, full_period=False)),
+        n_envs=n_envs,
+        seed=seed,
+    )
+    eval_env = Monitor(build_env(val_data, config, reward, scaler, full_period=True))
 
-    # 3. Initialize Environment
-    env = get_gym_env(df_train, reward_mode=args.reward_mode)
+    run_id = f"{agent_name}_{reward_mode}_{window}_s{seed}_{datetime.now():%Y%m%d_%H%M%S}"
+    out_dir = (Path(config.get("_tmp_dir", MODELS_DIR)) if dry_run else MODELS_DIR)
+    log_dir = out_dir / "logs" if dry_run else LOGS_DIR
+    best_dir = out_dir / f"{run_id}_best_tmp"
 
-    # 4. Attempt Stable-Baselines3 Training
-    try:
-        from stable_baselines3 import PPO, SAC
-        from stable_baselines3.common.callbacks import CheckpointCallback
+    hyperparams = dict(config["hyperparams"])
+    eval_freq = int(train_cfg["eval_freq"])
+    if dry_run:
+        eval_freq = DRY_RUN_EVAL_FREQ
+        if "n_steps" in hyperparams:
+            hyperparams["n_steps"] = DRY_RUN_N_STEPS
+        if "learning_starts" in hyperparams:
+            hyperparams["learning_starts"] = DRY_RUN_N_STEPS
 
-        model_dir = "models/checkpoints"
-        os.makedirs(model_dir, exist_ok=True)
+    agent = AGENTS[agent_name](vec_env, hyperparams, seed=seed, tensorboard_log=log_dir)
+    callback = EvalCallback(
+        eval_env,
+        n_eval_episodes=1,
+        eval_freq=max(eval_freq // n_envs, 1),
+        best_model_save_path=str(best_dir),
+        deterministic=True,
+        verbose=0,
+    )
+    agent.train(total_timesteps, callback=callback, tb_log_name=run_id)
 
-        algo = args.algo.upper()
-        print(f"[*] Initializing {algo} agent with reward_mode: {args.reward_mode}")
+    final_path = agent.save(out_dir / run_id)
+    best_path = out_dir / f"{run_id}_best.zip"
+    if (best_dir / "best_model.zip").exists():
+        shutil.move(str(best_dir / "best_model.zip"), best_path)
+    else:
+        shutil.copy(final_path, best_path)
+    shutil.rmtree(best_dir, ignore_errors=True)
 
-        if algo == "PPO":
-            model = PPO(
-                "MlpPolicy",
-                env,
-                learning_rate=args.lr,
-                n_steps=256,
-                batch_size=64,
-                gamma=0.99,
-                gae_lambda=0.95,
-                clip_range=0.2,
-                verbose=1,
-                tensorboard_log="./runs/"
-            )
-        elif algo == "SAC":
-            model = SAC(
-                "MlpPolicy",
-                env,
-                learning_rate=args.lr,
-                buffer_size=50_000,
-                batch_size=64,
-                gamma=0.99,
-                tau=0.005,
-                verbose=1,
-                tensorboard_log="./runs/"
-            )
-        else:
-            raise ValueError(f"Unsupported algorithm: {algo}")
+    summary: dict[str, Any] = {
+        "run_id": run_id,
+        "agent": agent_name,
+        "reward_mode": reward_mode,
+        "window": window,
+        "seed": seed,
+        "total_timesteps": total_timesteps,
+        "dry_run": dry_run,
+        "final_checkpoint": str(final_path),
+        "best_checkpoint": str(best_path),
+        "best_val_reward": float(callback.best_mean_reward),
+        "config": config,
+        "validation": {},
+    }
+    val_env = build_env(val_data, config, reward, scaler, full_period=True)
+    for label, path in (("final", final_path), ("best", best_path)):
+        ledger = rollout(AGENTS[agent_name].load(path), val_env)
+        metrics = evaluate_portfolio(ledger["daily_return"], ledger["nav"], risk_free_rate=0.0)
+        metrics["Avg Cash Weight"] = round(float(ledger["cash_weight"].mean()), 3)
+        metrics["Avg Turnover"] = round(float(ledger["turnover"].mean()), 4)
+        summary["validation"][label] = metrics
+        logger.info("[%s] validation (%s): %s", run_id, label, metrics)
 
-        print(f"[*] Training for {args.timesteps} timesteps...")
-        model.learn(total_timesteps=args.timesteps)
+    with (out_dir / f"{run_id}.json").open("w", encoding="utf-8") as fh:
+        json.dump(summary, fh, indent=2, ensure_ascii=False, default=str)
+    return summary
 
-        save_path = os.path.join(model_dir, f"{algo.lower()}_{args.reward_mode}_{args.symbol.replace('-', '_')}.zip")
-        model.save(save_path)
-        print(f"[+] Model saved successfully to: {save_path}")
 
-    except ImportError:
-        print("[!] Note: stable-baselines3 is not currently installed.")
-        print("[!] Running baseline agent simulation on the custom environment to verify logic...")
-        run_random_agent_benchmark(env)
+def main(argv: list[str] | None = None) -> None:
+    """CLI entrypoint."""
+    parser = argparse.ArgumentParser(description="Train a PPO/SAC agent on VN30PortfolioEnv")
+    parser.add_argument("--config", default="ppo_baseline.yaml", help="YAML in configs/ or a path")
+    parser.add_argument("--reward", choices=["A0", "A1", "A2", "A3"], help="Reward scheme (default: config)")
+    parser.add_argument("--seed", type=int, help="Seed (default: first of training.seeds)")
+    parser.add_argument("--window", help="Walk-forward window (default: training.window)")
+    parser.add_argument("--timesteps", type=int, help="Override training.total_timesteps")
+    parser.add_argument("--dry-run", action="store_true", help="Synthetic data, ~1000 steps, temp outputs")
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    config = load_config(args.config)
+    train_cfg = config["training"]
+    reward_mode = args.reward or config["reward"]["mode"]
+    seed = args.seed if args.seed is not None else int(train_cfg["seeds"][0])
+    window = args.window or str(train_cfg["window"])
+
+    if args.dry_run:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config["_tmp_dir"] = tmp
+            steps = args.timesteps or int(train_cfg["dry_run_timesteps"])
+            summary = train(config, reward_mode, seed, window, steps, dry_run=True)
+        logger.info("DRY RUN OK: %s trained %d steps", summary["run_id"], steps)
+        return
+
+    steps = args.timesteps or int(train_cfg["total_timesteps"])
+    summary = train(config, reward_mode, seed, window, steps)
+    logger.info("Finished %s -> %s", summary["run_id"], summary["final_checkpoint"])
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train Risk-Aware RL Trading Agent")
-    parser.add_argument("--symbol", type=str, default="BTC-USD", help="Ticker symbol")
-    parser.add_argument("--data", type=str, default=None, help="Path to precomputed features CSV")
-    parser.add_argument("--start", type=str, default="2021-01-01", help="Start date")
-    parser.add_argument("--end", type=str, default=None, help="End date")
-    parser.add_argument("--train-split", type=float, default=0.8, help="Train/test chronological split ratio")
-    parser.add_argument("--algo", type=str, default="PPO", choices=["PPO", "SAC"], help="RL algorithm")
-    parser.add_argument("--reward-mode", type=str, default="volatility_penalty",
-                        choices=["standard", "volatility_penalty", "differential_sharpe", "downside_sortino", "prospect_theory"],
-                        help="Risk-Aware reward formulation")
-    parser.add_argument("--timesteps", type=int, default=10_000, help="Total training timesteps")
-    parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
-
-    args = parser.parse_args()
-    train(args)
+    main()

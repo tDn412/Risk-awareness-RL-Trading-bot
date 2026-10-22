@@ -1,0 +1,54 @@
+# SAC baseline (secondary algorithm). Usage:
+#   python 03_Model_Development/train.py --config sac_baseline.yaml --reward A3 --seed 42
+agent: sac
+
+data:
+  feature_matrix: data/processed/feature_matrix.parquet
+  # Walk-forward windows (SOURCE_OF_TRUTH.md §5.4); only `train` is used for fitting,
+  # `val` for checkpoint selection, `test` is reserved for week-6 backtests.
+  windows:
+    window_1: {train: ["2018-01-01", "2020-12-31"], val: ["2021-01-01", "2021-12-31"], test: ["2022-01-01", "2022-12-31"]}
+    window_2: {train: ["2018-01-01", "2021-12-31"], val: ["2022-01-01", "2022-12-31"], test: ["2023-01-01", "2023-12-31"]}
+    window_3: {train: ["2018-01-01", "2022-12-31"], val: ["2023-01-01", "2023-12-31"], test: ["2024-01-01", "2024-12-31"]}
+    window_4: {train: ["2018-01-01", "2023-12-31"], val: ["2024-01-01", "2024-12-31"], test: ["2025-01-01", "2025-12-31"]}
+
+env:
+  initial_cash: 1000000000.0     # 1 billion VND (large enough for 100-share lots across 30 names)
+  softmax_temperature: 0.2       # tau: logits in [-1, 1] -> effective range [-5, 5]
+  episode_length: 252            # one trading year per episode, random start within train period
+  risk_window: 60                # days used for rolling variance / CVaR95
+
+reward:
+  mode: A0                       # overridden by --reward {A0,A1,A2,A3}
+  reward_scale: 100.0            # daily returns ~1e-2 -> rewards ~O(1)
+  lambda_vol: 5.0                # A1: penalty on rolling variance of returns
+  lambda_down: 10.0              # A2: penalty on squared shortfall below min_return
+  min_return: 0.0                # A2: target daily return m
+  lambda_dd: 0.5                 # A2/A3: drawdown barrier slope
+  dd_threshold: 0.15             # A2/A3: tolerated drawdown d*
+  lambda_cvar: 1.0               # A3: CVaR barrier slope
+  cvar_target: 0.03              # A3: tolerated daily CVaR95 (3%)
+  pt_alpha: 0.88                 # A3: prospect-theory gain curvature
+  pt_beta: 0.88                  # A3: prospect-theory loss curvature
+  pt_lambda_loss: 2.25           # A3: loss aversion
+
+training:
+  window: window_1
+  total_timesteps: 150000
+  seeds: [42]
+  n_envs: 1
+  eval_freq: 15000
+  torch_threads: 2
+  dry_run_timesteps: 1000
+
+hyperparams:                     # passed verbatim to stable_baselines3.SAC
+  learning_rate: 0.0003
+  buffer_size: 200000
+  learning_starts: 5000
+  batch_size: 256
+  tau: 0.005
+  gamma: 0.99
+  train_freq: 1
+  gradient_steps: 1
+  ent_coef: auto
+  net_arch: [256, 256]
