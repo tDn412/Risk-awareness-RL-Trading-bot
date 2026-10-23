@@ -1,213 +1,213 @@
-"""
-Streamlit Web Dashboard: Antigravity Risk-Aware RL Trading Bot
-Project: Antigravity - Risk-Aware Reinforcement Learning Trading Bot
+"""Streamlit dashboard: Risk-Aware RL for VN30 portfolio allocation.
 
-Provides an interactive quantitative research dashboard to explore:
-- Risk-Aware reward configurations
-- Live backtest comparisons against Buy & Hold and Trend Following
-- Underwater drawdown charts, equity curves, and position heatmaps
+Read-only viewer of the saved backtest results in ``outputs/backtest_results/`` (written by
+``04_Backtesting_Evaluation/backtester.py``). It never trains or simulates anything.
+
+Run:
+    streamlit run 05_Deployment_Demo/app.py
 """
 
-import os
-import sys
-import numpy as np
+from __future__ import annotations
+
+from pathlib import Path
+
 import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
 
-# Add subdirectories to sys.path
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-for sub in ["02_Data_Pipeline", "03_Model_Development", "04_Backtesting_Evaluation"]:
-    sub_path = os.path.join(PROJECT_ROOT, sub)
-    if sub_path not in sys.path:
-        sys.path.insert(0, sub_path)
+REPO_ROOT = Path(__file__).resolve().parents[1]
+RESULTS_DIR = REPO_ROOT / "outputs" / "backtest_results"
+DEFAULT_WINDOW = "window_1"
+TEST_PERIODS = {"window_1": "2022 (bear market)"}
 
-try:
-    import streamlit as st
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    STREAMLIT_AVAILABLE = True
-except ImportError:
-    STREAMLIT_AVAILABLE = False
+REWARD_COLORS = {"A0": "#2a78d6", "A1": "#eb6834", "A2": "#1baf7a", "A3": "#e87ba4"}
+BASELINE_STYLES = {
+    "VN30 Index (Buy&Hold)": ("#0b0b0b", "solid"),
+    "Equal Weight 1/N": ("#52514e", "dash"),
+    "Static 60/40": ("#8a8984", "dot"),
+    "100% Cash": ("#b4b3ad", "dashdot"),
+}
+METRIC_COLUMNS = [
+    "Total Return (%)",
+    "Sharpe Ratio",
+    "Sortino Ratio",
+    "Max Drawdown (%)",
+    "Calmar Ratio",
+    "CVaR (95%)",
+    "Annualized Volatility (%)",
+    "Avg Cash Weight",
+    "Avg Turnover",
+    "Friction (%/yr)",
+]
+CHART_HEIGHT = 380
 
-from env.trading_env import RiskAwareTradingEnv
-from metrics import evaluate_portfolio
-from data_collector import fetch_market_data, add_features
+REWARD_DESCRIPTIONS = {
+    "A0": "Risk-neutral: net return only.",
+    "A1": "Net return minus a rolling-variance penalty.",
+    "A2": "Net return minus downside semi-variance and a drawdown barrier (d* = 15%).",
+    "A3": "Prospect-theory utility minus CVaR-95 and drawdown barriers.",
+}
 
 
-def main():
-    if not STREAMLIT_AVAILABLE:
-        print("[!] Streamlit and Plotly are required to run this dashboard.")
-        print("    Install them via: pip install streamlit plotly")
+def result_paths(window: str) -> tuple[Path, Path]:
+    """Return ``(curves_csv, runs_csv)`` for a window."""
+    return RESULTS_DIR / f"{window}_test_curves.csv", RESULTS_DIR / f"{window}_test_runs.csv"
+
+
+def load_curves(path: Path) -> dict[str, pd.DataFrame]:
+    """Load seed-averaged curves (``nav``, ``drawdown``, ``cash_weight``) per strategy."""
+    frame = pd.read_csv(path, header=[0, 1], index_col=0, parse_dates=True)
+    return {str(name): frame[name].copy() for name in frame.columns.get_level_values(0).unique()}
+
+
+def load_runs(path: Path) -> pd.DataFrame:
+    """Load per-run metrics (agents, EEB and baselines)."""
+    return pd.read_csv(path)
+
+
+def metric_table(runs: pd.DataFrame) -> pd.DataFrame:
+    """Mean metrics per strategy with the number of seeds, EEB rows excluded."""
+    own = runs[runs["kind"] != "eeb"]
+    grouped = own.groupby("group", sort=False)
+    table = grouped[METRIC_COLUMNS].mean().round(2)
+    table.insert(0, "Seeds", grouped.size())
+    return table
+
+
+def eeb_table(runs: pd.DataFrame) -> pd.DataFrame:
+    """Agent vs its Equivalent Equity Benchmark (same equity exposure, equal-weight stocks)."""
+    agents = runs[runs["kind"] == "agent"].copy()
+    eeb = runs[runs["kind"] == "eeb"].copy()
+    eeb["group"] = eeb["group"].str.replace("EEB of ", "", regex=False)
+    agent_ret = agents.groupby("group", sort=False)["Total Return (%)"].mean()
+    eeb_ret = eeb.groupby("group", sort=False)["Total Return (%)"].mean()
+    table = pd.DataFrame(
+        {
+            "Agent return (%)": agent_ret,
+            "EEB return (%)": eeb_ret,
+            "Agent − EEB (pp)": agent_ret - eeb_ret,
+            "Agent friction (%/yr)": agents.groupby("group", sort=False)["Friction (%/yr)"].mean(),
+            "EEB friction (%/yr)": eeb.groupby("group", sort=False)["Friction (%/yr)"].mean(),
+            "p-value (paired t, daily)": agents.groupby("group", sort=False)["p_vs_EEB"].mean(),
+        }
+    )
+    return table.round(3)
+
+
+def series_style(name: str) -> tuple[str, str, float]:
+    """Return ``(color, dash, width)`` for a strategy (agents by reward, baselines neutral)."""
+    if name in BASELINE_STYLES:
+        color, dash = BASELINE_STYLES[name]
+        return color, dash, 2.0
+    reward = name.split()[-1]
+    return REWARD_COLORS.get(reward, "#52514e"), "dot" if name.startswith("SAC") else "solid", 2.0
+
+
+def line_chart(curves: dict[str, pd.DataFrame], names: list[str], column: str, title: str, unit: str) -> go.Figure:
+    """Line chart of one curve column for the selected strategies."""
+    fig = go.Figure()
+    for name in names:
+        if column == "cash_weight" and curves[name][column].isna().all():
+            continue
+        series = curves[name][column].iloc[1:] if column == "cash_weight" else curves[name][column]
+        color, dash, width = series_style(name)
+        fig.add_trace(
+            go.Scatter(
+                x=series.index,
+                y=series,
+                name=name,
+                mode="lines",
+                line={"color": color, "dash": dash, "width": width},
+                hovertemplate=f"{name}: %{{y:.1f}}{unit}<extra></extra>",
+            )
+        )
+    fig.update_layout(
+        title={"text": title, "x": 0.0, "font": {"size": 15}},
+        height=CHART_HEIGHT,
+        margin={"l": 8, "r": 8, "t": 44, "b": 8},
+        hovermode="x unified",
+        legend={"orientation": "h", "y": -0.3},
+    )
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(gridcolor="rgba(128,128,128,0.2)", ticksuffix=unit)
+    return fig
+
+
+def main() -> None:
+    """Render the dashboard."""
+    st.set_page_config(page_title="Risk-Aware RL · VN30", page_icon="📉", layout="wide")
+    st.title("Risk-Aware RL for VN30 portfolio allocation")
+    st.caption("INT3011E · PPO / SAC agents, four reward schemes (A0–A3), HOSE execution rules · demo of saved results")
+
+    window = DEFAULT_WINDOW
+    curves_path, runs_path = result_paths(window)
+    if not curves_path.exists() or not runs_path.exists():
+        st.error(
+            f"No backtest results found in `{RESULTS_DIR}`. Run "
+            "`python 04_Backtesting_Evaluation/backtester.py --window window_1` first."
+        )
+        return
+    curves = load_curves(curves_path)
+    runs = load_runs(runs_path)
+    table = metric_table(runs)
+
+    agent_names = [name for name in curves if name.split()[-1] in REWARD_COLORS]
+    baseline_names = [name for name in curves if name in BASELINE_STYLES]
+
+    with st.sidebar:
+        st.header("View")
+        st.write(f"**Test period:** {TEST_PERIODS[window]}")
+        st.caption("Agents trained 2018–2020, checkpoint chosen on 2021 validation, evaluated on unseen 2022.")
+        chosen_agents = st.multiselect("Agents", agent_names, default=[n for n in agent_names if n.startswith("PPO")])
+        chosen_baselines = st.multiselect("Baselines", baseline_names, default=baseline_names[:2])
+        st.divider()
+        st.markdown("**Reward schemes**")
+        for key, text in REWARD_DESCRIPTIONS.items():
+            st.markdown(f"- **{key}** — {text}")
+
+    selected = chosen_agents + chosen_baselines
+    if not selected:
+        st.info("Select at least one strategy in the sidebar.")
         return
 
-    st.set_page_config(
-        page_title="Antigravity | Risk-Aware RL Trading Bot",
-        page_icon="📈",
-        layout="wide",
-        initial_sidebar_state="expanded"
+    st.warning(
+        "**Honest result:** in the 2022 crash every agent lost money and none beat the VN30 index except "
+        "marginally (A2/A3). Daily turnover of 18–37% costs 17–36% a year in fees and tax, which explains most of the gap "
+        "to the low-turnover benchmark with the same equity exposure (EEB). The next step is a turnover penalty."
     )
 
-    st.markdown("""
-        <style>
-        .metric-card {
-            background-color: #1e222d;
-            border-radius: 10px;
-            padding: 15px;
-            border-left: 4px solid #2962ff;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+    cols = st.columns(min(len(selected), 4))
+    for col, name in zip(cols, selected[:4]):
+        row = table.loc[name]
+        col.metric(name, f"{row['Total Return (%)']:.1f}%", f"MDD {row['Max Drawdown (%)']:.1f}%", delta_color="off")
 
-    st.title("🛡️ Antigravity: Risk-Aware RL Trading Dashboard")
-    st.caption("Quantitative Reinforcement Learning with Multi-Objective Risk Reward Shaping & Behavioral Utility")
+    left, right = st.columns(2)
+    left.plotly_chart(line_chart(curves, selected, "nav", "NAV (start = 100)", ""), use_container_width=True)
+    right.plotly_chart(line_chart(curves, selected, "drawdown", "Drawdown", "%"), use_container_width=True)
+    if chosen_agents:
+        st.plotly_chart(
+            line_chart(curves, chosen_agents, "cash_weight", "Agent cash weight", "%"), use_container_width=True
+        )
 
-    # Sidebar Controls
-    st.sidebar.header("⚙️ Strategy & Market Settings")
-    symbol = st.sidebar.selectbox(
-        "Select Market Asset",
-        ["BTC-USD", "ETH-USD", "^VNINDEX", "HPG.VN", "SPY", "Synthetic Simulation"],
-        index=0
+    st.subheader("Performance metrics (test period, mean over seeds)")
+    st.dataframe(table.loc[selected], use_container_width=True)
+    with st.expander("All strategies"):
+        st.dataframe(table, use_container_width=True)
+
+    st.subheader("Agent vs Equivalent Equity Benchmark (H3)")
+    st.caption(
+        "EEB holds equal-weight stocks at the agent's own daily equity exposure, so the gap isolates "
+        "stock-selection and timing from simple de-risking — and, here, from transaction costs."
     )
+    st.dataframe(eeb_table(runs), use_container_width=True)
 
-    reward_mode = st.sidebar.selectbox(
-        "Reward Shaping Paradigm",
-        [
-            "volatility_penalty",
-            "prospect_theory",
-            "differential_sharpe",
-            "downside_sortino",
-            "standard"
-        ],
-        format_func=lambda x: {
-            "volatility_penalty": "Volatility & Drawdown Barrier Penalty",
-            "prospect_theory": "Prospect Theory (Loss Aversion λ > 1)",
-            "differential_sharpe": "Differential Sharpe Ratio (Moody & Saffell)",
-            "downside_sortino": "Downside Semi-Variance (Sortino)",
-            "standard": "Standard Return (Unconstrained RL)"
-        }[x]
-    )
-
-    st.sidebar.subheader("Risk Hyperparameters")
-    lambda_vol = st.sidebar.slider("Volatility Penalty (λ₁)", 0.0, 10.0, 2.0, 0.5)
-    lambda_dd = st.sidebar.slider("Drawdown Penalty (λ₂)", 0.0, 20.0, 5.0, 1.0)
-    dd_tol = st.sidebar.slider("Drawdown Tolerance Threshold", 0.01, 0.20, 0.05, 0.01)
-    prospect_lambda = st.sidebar.slider("Prospect Loss Aversion (λ)", 1.0, 4.0, 2.25, 0.25)
-
-    initial_capital = st.sidebar.number_input("Initial Portfolio Capital ($)", value=10000, step=1000)
-
-    # 1. Fetch & Prepare Data
-    with st.spinner(f"Loading market data and quantitative features for {symbol}..."):
-        raw_df = fetch_market_data(symbol)
-        df = add_features(raw_df)
-
-    # 2. Run Simulations
-    # Out of sample split (last 300 candles or 30%)
-    eval_len = min(300, int(len(df) * 0.4))
-    df_eval = df.iloc[-eval_len:].reset_index(drop=True)
-
-    # Run Benchmark: Buy & Hold
-    bh_returns = df_eval["Close"].pct_change().fillna(0.0).values
-    bh_equity = initial_capital * np.cumprod(1.0 + bh_returns)
-
-    # Run Risk-Aware Agent Simulation
-    env = RiskAwareTradingEnv(
-        df_eval,
-        reward_mode=reward_mode,
-        lambda_vol=lambda_vol,
-        lambda_dd=lambda_dd,
-        dd_tolerance=dd_tol,
-        prospect_lambda=prospect_lambda,
-        initial_balance=initial_capital
-    )
-    obs, info = env.reset()
-    terminated = truncated = False
-
-    agent_equity = [initial_capital]
-    agent_returns = []
-    positions = [0.0]
-    drawdowns = [0.0]
-
-    while not (terminated or truncated):
-        curr_dd = info["drawdown"]
-        # Adaptive Risk Control Policy
-        if curr_dd > dd_tol:
-            target_pos = max(0.0, 0.8 - (curr_dd / dd_tol) * 0.6)
-        else:
-            target_pos = 0.9  # Normal regime position
-
-        obs, reward, terminated, truncated, info = env.step(np.array([target_pos]))
-        agent_equity.append(info["portfolio_value"])
-        agent_returns.append(info["net_return"])
-        positions.append(info["position"])
-        drawdowns.append(info["drawdown"])
-
-    # 3. Calculate Performance Metrics
-    ra_metrics = evaluate_portfolio(np.array(agent_returns), np.array(agent_equity))
-    bh_metrics = evaluate_portfolio(bh_returns, bh_equity)
-
-    # 4. Display KPI Header
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Strategy Return", f"{ra_metrics['Total Return (%)']}%", delta=f"{round(ra_metrics['Total Return (%)'] - bh_metrics['Total Return (%)'], 2)}% vs B&H")
-    col2.metric("Sharpe Ratio", f"{ra_metrics['Sharpe Ratio']}", delta=f"{round(ra_metrics['Sharpe Ratio'] - bh_metrics['Sharpe Ratio'], 2)}")
-    col3.metric("Sortino Ratio", f"{ra_metrics['Sortino Ratio']}")
-    col4.metric("Max Drawdown", f"{ra_metrics['Max Drawdown (%)']}%", delta=f"-{round(bh_metrics['Max Drawdown (%)'] - ra_metrics['Max Drawdown (%)'], 2)}% lower", delta_color="inverse")
-    col5.metric("Calmar Ratio", f"{ra_metrics['Calmar Ratio']}")
-
-    # 5. Charts
-    tab1, tab2, tab3 = st.tabs(["📊 Equity & Drawdown", "🎯 Position Exposure", "📋 Comprehensive Metrics"])
-
-    with tab1:
-        fig = make_subplots(
-            rows=2, cols=1,
-            shared_xaxes=True,
-            vertical_spacing=0.08,
-            subplot_titles=("Cumulative Portfolio Equity ($)", "Underwater Drawdown Profile (%)"),
-            row_heights=[0.7, 0.3]
+    with st.expander("HOSE rules enforced in the simulator"):
+        st.markdown(
+            "- T+2 settlement: shares bought on day T cannot be sold on T or T+1\n"
+            "- ±7% daily price band; no buying at the ceiling, no selling at the floor\n"
+            "- 100-share lots, long-only, cash as asset 0 (31-dim simplex action)\n"
+            "- 0.15% brokerage on both sides and 0.1% tax on sells"
         )
-
-        # Equity Curve
-        fig.add_trace(
-            go.Scatter(y=agent_equity, name="Antigravity (Risk-Aware RL)", line=dict(color="#00E676", width=2.5)),
-            row=1, col=1
-        )
-        fig.add_trace(
-            go.Scatter(y=bh_equity, name="Buy & Hold Benchmark", line=dict(color="#78909C", width=1.5, dash="dot")),
-            row=1, col=1
-        )
-
-        # Drawdown Profile
-        dd_percent = [-d * 100 for d in drawdowns]
-        fig.add_trace(
-            go.Scatter(y=dd_percent, fill='tozeroy', name="Strategy Drawdown", line=dict(color="#FF5252", width=1.5)),
-            row=2, col=1
-        )
-
-        fig.update_layout(height=600, template="plotly_dark", hovermode="x unified")
-        st.plotly_chart(fig, use_container_width=True)
-
-    with tab2:
-        fig_pos = go.Figure()
-        fig_pos.add_trace(go.Scatter(
-            y=positions,
-            mode='lines',
-            fill='tozeroy',
-            name="Asset Allocation Weight",
-            line=dict(color="#29B6F6", width=2)
-        ))
-        fig_pos.update_layout(
-            title="Agent Dynamic Position Sizing over Time (0.0 = Cash, 1.0 = 100% Long)",
-            yaxis_title="Position Allocation",
-            template="plotly_dark",
-            height=380
-        )
-        st.plotly_chart(fig_pos, use_container_width=True)
-
-    with tab3:
-        comp_df = pd.DataFrame({
-            "Metric": list(ra_metrics.keys()),
-            "Antigravity Risk-Aware": list(ra_metrics.values()),
-            "Buy & Hold": list(bh_metrics.values())
-        })
-        st.dataframe(comp_df, use_container_width=True)
 
 
 if __name__ == "__main__":
