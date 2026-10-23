@@ -20,6 +20,11 @@ try:
 except ImportError:
     Quote = None
 
+try:
+    from collectors.vci_client import fetch_vci_daily_ohlcv
+except ImportError:  # executed as a standalone script from collectors/
+    from vci_client import fetch_vci_daily_ohlcv  # type: ignore[no-redef]
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -56,7 +61,7 @@ def fetch_benchmark_indices(
         indices = DEFAULT_INDICES
 
     if Quote is None:
-        raise ImportError("vnstock library is not installed.")
+        logger.warning("vnstock unavailable; using direct VCI client fallback.")
 
     os.makedirs(output_dir, exist_ok=True)
     results = {}
@@ -64,8 +69,11 @@ def fetch_benchmark_indices(
     for idx, symbol in enumerate(indices, 1):
         logger.info(f"[{idx}/{len(indices)}] Fetching benchmark index: {symbol}...")
         try:
-            q = Quote(symbol=symbol, source=source)
-            df = q.history(start=start_date, end=end_date, interval="1D")
+            if Quote is not None:
+                q = Quote(symbol=symbol, source=source)
+                df = q.history(start=start_date, end=end_date, interval="1D")
+            else:
+                df = fetch_vci_daily_ohlcv(symbol, start_date, end_date)
 
             if df is not None and not df.empty:
                 rename_map = {

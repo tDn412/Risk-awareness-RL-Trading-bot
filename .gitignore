@@ -76,3 +76,6 @@ htmlcov/
 .pytest_cache/
 .mypy_cache/
 
+
+# Trained models & run summaries
+outputs/models/*

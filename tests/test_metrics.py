@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "04_Backtesting_Evaluation")))
-from metrics import compute_drawdown, evaluate_portfolio
+from metrics import compute_drawdown, evaluate_portfolio, sortino_ratio
 
 
 def test_compute_drawdown():
@@ -58,3 +58,13 @@ def test_evaluate_portfolio_all_positive():
     metrics = evaluate_portfolio(returns, equity)
     assert metrics["Profit Factor"] == 999.0
     assert metrics["Max Drawdown (%)"] == 0.0
+
+
+def test_sortino_ratio():
+    """Known input/output pair (4 d.p.) and the no-downside edge case."""
+    returns = pd.Series([0.02, -0.01, 0.03, -0.02])
+    # mean = 0.005; downside dev = sqrt((0.01^2 + 0.02^2) / 4) = sqrt(0.000125)
+    expected = 0.005 / np.sqrt(0.000125) * np.sqrt(252)
+    assert sortino_ratio(returns) == pytest.approx(expected, abs=1e-4)
+    assert round(sortino_ratio(returns), 4) == 7.0993
+    assert sortino_ratio(pd.Series([0.01, 0.0, 0.02])) == float("inf")

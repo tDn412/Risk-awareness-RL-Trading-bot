@@ -119,6 +119,28 @@ def evaluate_portfolio(
     }
 
 
+def sortino_ratio(returns: pd.Series, target: float = 0.0, periods_per_year: int = 252) -> float:
+    """Annualised Sortino ratio.
+
+    Formula: ``mean(r - target) / DD * sqrt(periods_per_year)`` with downside deviation
+    ``DD = sqrt(mean(min(r - target, 0)^2))`` taken over *all* observations.
+
+    Args:
+        returns: Periodic (daily) simple returns.
+        target: Per-period minimum acceptable return.
+        periods_per_year: Annualisation factor.
+
+    Returns:
+        The ratio; ``float('inf')`` if no return falls below ``target``.
+    """
+    excess = returns.astype(float) - target
+    downside = np.minimum(excess, 0.0)
+    if not (downside < 0.0).any():
+        return float("inf")
+    downside_dev = float(np.sqrt((downside**2).mean()))
+    return float(excess.mean() / downside_dev * np.sqrt(periods_per_year))
+
+
 def print_metrics_summary(strategy_name: str, metrics: Dict[str, float]) -> None:
     """Pretty prints metrics dictionary in terminal."""
     print("=" * 48)
