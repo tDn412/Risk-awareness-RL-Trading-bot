@@ -31,3 +31,10 @@ def test_app_renders_without_exception() -> None:
     assert len(at.multiselect) == 2
     at.multiselect[0].set_value(["PPO A2", "SAC A3"]).run()
     assert not at.exception
+
+
+@pytest.mark.skipif(not HAS_RESULTS, reason="backtest results not generated")
+def test_result_summary_mentions_index() -> None:
+    _, runs_path = app.result_paths(app.DEFAULT_WINDOW)
+    text = app.result_summary(app.metric_table(app.load_runs(runs_path)))
+    assert "VN30 index returned" in text

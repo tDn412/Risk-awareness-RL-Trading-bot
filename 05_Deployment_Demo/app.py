@@ -94,6 +94,29 @@ def eeb_table(runs: pd.DataFrame) -> pd.DataFrame:
     return table.round(3)
 
 
+INDEX_NAME = "VN30 Index (Buy&Hold)"
+
+
+def result_summary(table: pd.DataFrame) -> str:
+    """One-paragraph summary of agents vs the VN30 index, computed from the metric table."""
+    agents = table[[name.split()[-1] in REWARD_COLORS for name in table.index]]
+    if agents.empty or INDEX_NAME not in table.index:
+        return ""
+    index_ret = float(table["Total Return (%)"].astype(float)[INDEX_NAME])
+    beat = [name for name in agents.index if agents.loc[name, "Total Return (%)"] > index_ret]
+    best = str(agents["Total Return (%)"].idxmax())
+    turnover = agents["Avg Turnover"] * 100
+    friction = agents["Friction (%/yr)"]
+    beat_text = ", ".join(beat) if beat else "none"
+    return (
+        f"**Result on the test period:** VN30 index returned {index_ret:.1f}%. "
+        f"Agents beating it: {beat_text}. Best agent: {best} "
+        f"({agents.loc[best, 'Total Return (%)']:.1f}%, max drawdown {agents.loc[best, 'Max Drawdown (%)']:.1f}%). "
+        f"Agent daily turnover {turnover.min():.1f}–{turnover.max():.1f}%, "
+        f"fees and tax {friction.min():.1f}–{friction.max():.1f}% per year."
+    )
+
+
 def series_style(name: str) -> tuple[str, str, float]:
     """Return ``(color, dash, width)`` for a strategy (agents by reward, baselines neutral)."""
     if name in BASELINE_STYLES:
@@ -170,11 +193,9 @@ def main() -> None:
         st.info("Select at least one strategy in the sidebar.")
         return
 
-    st.warning(
-        "**Honest result:** in the 2022 crash every agent lost money and none beat the VN30 index except "
-        "marginally (A2/A3). Daily turnover of 18–37% costs 17–36% a year in fees and tax, which explains most of the gap "
-        "to the low-turnover benchmark with the same equity exposure (EEB). The next step is a turnover penalty."
-    )
+    summary_text = result_summary(table)
+    if summary_text:
+        st.info(summary_text)
 
     cols = st.columns(min(len(selected), 4))
     for col, name in zip(cols, selected[:4]):
