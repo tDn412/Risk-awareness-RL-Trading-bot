@@ -250,6 +250,8 @@ def run_backtest(
         "softmax_temperature": float(env_cfg["softmax_temperature"]),
         "risk_window": int(env_cfg["risk_window"]),
         "feature_scaler": scaler,
+        "no_trade_band": float(env_cfg.get("no_trade_band", 0.0)),
+        "action_smoothing": float(env_cfg.get("action_smoothing", 1.0)),
     }
     logger.info("Test period %s..%s (%d days)", test.dates[0].date(), test.dates[-1].date(), test.n_days)
 

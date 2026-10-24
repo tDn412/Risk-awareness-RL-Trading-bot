@@ -112,6 +112,8 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         episode_length: int | None = None,
         risk_window: int = DEFAULT_RISK_WINDOW,
         feature_scaler: FeatureScaler | None = None,
+        no_trade_band: float = 0.0,
+        action_smoothing: float = 1.0,
     ) -> None:
         """Create the environment.
 
@@ -125,6 +127,9 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
                 period from the first day.
             risk_window: Rolling window (days) for variance / CVaR in rewards and info.
             feature_scaler: Scaler fitted on training data; fitted on ``data`` if omitted.
+            no_trade_band: An asset is only traded when its target weight differs from its
+                current weight by at least this much (0 disables). Suppresses churn.
+            action_smoothing: ``α`` in ``w = α·w_target + (1-α)·w_current`` (1 disables).
         """
         super().__init__()
         if data is None:
@@ -135,6 +140,10 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
                 data = make_synthetic_market_data()
         if data.n_days < 2:
             raise ValueError("Need at least 2 trading days.")
+        if not 0.0 <= no_trade_band < 1.0:
+            raise ValueError("no_trade_band must be in [0, 1).")
+        if not 0.0 < action_smoothing <= 1.0:
+            raise ValueError("action_smoothing must be in (0, 1].")
         if episode_length is not None and not 1 <= episode_length < data.n_days:
             raise ValueError(f"episode_length must be in [1, {data.n_days - 1}].")
 
@@ -144,6 +153,8 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.temperature = float(softmax_temperature)
         self.episode_length = episode_length
         self.risk_window = int(risk_window)
+        self.no_trade_band = float(no_trade_band)
+        self.action_smoothing = float(action_smoothing)
 
         scaler = feature_scaler or data.fit_scaler()
         n, f = data.n_assets, data.n_features
@@ -252,8 +263,10 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         weights_before = self.weights()
         value = self.portfolio_value()
         safe_price = np.where(price > 0, price, 1.0)
+        # No-trade band: assets whose weight change is below the band keep their holdings.
+        trade = listed & (np.abs(target_weights[1:] - weights_before[1:]) >= self.no_trade_band)
         target_shares = np.where(
-            listed, np.round(target_weights[1:] * value / (safe_price * LOT_SIZE)) * LOT_SIZE, self._shares
+            trade, np.round(target_weights[1:] * value / (safe_price * LOT_SIZE)) * LOT_SIZE, self._shares
         ).astype(np.int64)
         delta = target_shares - self._shares
 
@@ -320,6 +333,8 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Execute one trading day (see module docstring for timing)."""
         value_before = self.portfolio_value()
         target = self.action_to_weights(action)
+        if self.action_smoothing < 1.0:
+            target = self.action_smoothing * target + (1.0 - self.action_smoothing) * self.weights()
         execution = self._execute(target)
 
         self._advance_day()
@@ -330,7 +345,7 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         self._returns.append(net_return)
         window = np.fromiter(self._returns, dtype=np.float64)
 
-        reward = compute_reward(self.reward_config, net_return, drawdown, window)
+        reward = compute_reward(self.reward_config, net_return, drawdown, window, execution.turnover)
         terminated = self._t >= self._end
         info: dict[str, Any] = {
             "portfolio_value": value_after,

@@ -6,7 +6,7 @@ Example:
 
 Per run (``run_id = <agent>_<reward>_<window>_s<seed>_<timestamp>``) it writes:
     outputs/models/<run_id>.zip       final checkpoint
-    outputs/models/<run_id>_best.zip  checkpoint with best validation reward
+    outputs/models/<run_id>_best.zip  checkpoint with best validation Sharpe ratio
     outputs/models/<run_id>.json      config snapshot + validation metrics
     outputs/logs/<run_id>/            TensorBoard logs (incl. rollout/ep_rew_mean)
 """
@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -24,7 +23,6 @@ from typing import Any
 
 import torch
 import yaml
-from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.monitor import Monitor
 
@@ -35,6 +33,7 @@ for sub in (MODEL_DIR_NAME, "04_Backtesting_Evaluation"):
         sys.path.insert(0, str(REPO_ROOT / sub))
 
 from agents import AGENTS  # noqa: E402
+from callbacks import SharpeCheckpointCallback  # noqa: E402
 from env import RewardConfig, VN30PortfolioEnv, load_market_data, make_synthetic_market_data  # noqa: E402
 from env.market_data import FeatureScaler, MarketData  # noqa: E402
 from metrics import evaluate_portfolio  # noqa: E402
@@ -77,6 +76,8 @@ def build_env(
         episode_length=None if full_period else int(env_cfg["episode_length"]),
         risk_window=int(env_cfg["risk_window"]),
         feature_scaler=scaler,
+        no_trade_band=float(env_cfg.get("no_trade_band", 0.0)),
+        action_smoothing=float(env_cfg.get("action_smoothing", 1.0)),
     )
 
 
@@ -124,12 +125,12 @@ def train(
         n_envs=n_envs,
         seed=seed,
     )
-    eval_env = Monitor(build_env(val_data, config, reward, scaler, full_period=True))
+    eval_env = build_env(val_data, config, reward, scaler, full_period=True)
 
     run_id = f"{agent_name}_{reward_mode}_{window}_s{seed}_{datetime.now():%Y%m%d_%H%M%S}"
     out_dir = (Path(config.get("_tmp_dir", MODELS_DIR)) if dry_run else MODELS_DIR)
     log_dir = out_dir / "logs" if dry_run else LOGS_DIR
-    best_dir = out_dir / f"{run_id}_best_tmp"
+    best_path = out_dir / f"{run_id}_best.zip"
 
     hyperparams = dict(config["hyperparams"])
     eval_freq = int(train_cfg["eval_freq"])
@@ -141,23 +142,10 @@ def train(
             hyperparams["learning_starts"] = DRY_RUN_N_STEPS
 
     agent = AGENTS[agent_name](vec_env, hyperparams, seed=seed, tensorboard_log=log_dir)
-    callback = EvalCallback(
-        eval_env,
-        n_eval_episodes=1,
-        eval_freq=max(eval_freq // n_envs, 1),
-        best_model_save_path=str(best_dir),
-        deterministic=True,
-        verbose=0,
-    )
+    callback = SharpeCheckpointCallback(eval_env, eval_freq=max(eval_freq // n_envs, 1), save_path=best_path)
     agent.train(total_timesteps, callback=callback, tb_log_name=run_id)
 
     final_path = agent.save(out_dir / run_id)
-    best_path = out_dir / f"{run_id}_best.zip"
-    if (best_dir / "best_model.zip").exists():
-        shutil.move(str(best_dir / "best_model.zip"), best_path)
-    else:
-        shutil.copy(final_path, best_path)
-    shutil.rmtree(best_dir, ignore_errors=True)
 
     summary: dict[str, Any] = {
         "run_id": run_id,
@@ -169,7 +157,7 @@ def train(
         "dry_run": dry_run,
         "final_checkpoint": str(final_path),
         "best_checkpoint": str(best_path),
-        "best_val_reward": float(callback.best_mean_reward),
+        "best_val_sharpe": float(callback.best_sharpe),
         "config": config,
         "validation": {},
     }

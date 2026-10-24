@@ -140,3 +140,31 @@ def test_unlisted_assets_get_zero_weight() -> None:
     assert weights.sum() == pytest.approx(1.0)
     env.step(np.ones(4, dtype=np.float32))
     assert env.shares[2] == 0
+
+
+def test_no_trade_band_suppresses_small_rebalances() -> None:
+    data = make_synthetic_market_data(n_days=30, n_assets=5, seed=4)
+    env = VN30PortfolioEnv(data, no_trade_band=0.05)
+    env.reset(seed=0)
+    env.step(np.zeros(6, dtype=np.float32))  # equal split: ~16.7% per asset, all > band
+    held = env.shares
+    assert held.sum() > 0
+    _, _, _, _, info = env.step(np.zeros(6, dtype=np.float32))  # same target: only drift-sized moves
+    np.testing.assert_array_equal(env.shares, held)
+    assert info["transaction_cost"] == 0.0
+
+
+def test_action_smoothing_moves_partially_toward_target() -> None:
+    env = _const_env(n_assets=1)
+    env = VN30PortfolioEnv(env.data, initial_cash=CAPITAL, action_smoothing=0.5)
+    env.reset(seed=0)
+    env.step(_all_in(1, 1))
+    assert env.weights()[1] == pytest.approx(0.5, abs=0.01)
+
+
+def test_invalid_turnover_controls_rejected() -> None:
+    data = make_synthetic_market_data(n_days=10, n_assets=2)
+    with pytest.raises(ValueError):
+        VN30PortfolioEnv(data, no_trade_band=1.5)
+    with pytest.raises(ValueError):
+        VN30PortfolioEnv(data, action_smoothing=0.0)

@@ -17,6 +17,8 @@ env:
   softmax_temperature: 0.2       # tau: logits in [-1, 1] -> effective range [-5, 5]
   episode_length: 252            # one trading year per episode, random start within train period
   risk_window: 60                # days used for rolling variance / CVaR95
+  no_trade_band: 0.02            # trade an asset only if its weight moves >= 2 pp (anti-churn)
+  action_smoothing: 1.0          # alpha in w = a*w_target + (1-a)*w_current; 1.0 = off
 
 reward:
   mode: A0                       # overridden by --reward {A0,A1,A2,A3}
@@ -31,6 +33,7 @@ reward:
   pt_alpha: 0.88                 # A3: prospect-theory gain curvature
   pt_beta: 0.88                  # A3: prospect-theory loss curvature
   pt_lambda_loss: 2.25           # A3: loss aversion
+  lambda_turn: 0.005             # all modes: penalty per unit of one-way turnover (~2x real cost)
 
 training:
   window: window_1

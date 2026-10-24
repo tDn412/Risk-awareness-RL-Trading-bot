@@ -7,6 +7,10 @@
 * A3 — prospect-theory utility + CVaR barrier + drawdown barrier:
   ``U(r_net) - λ_cvar · max(0, CVaR95 - CVaR_target) - λ_dd · max(0, DD - d*)``.
 
+Every scheme also subtracts ``λ_turn · turnover`` (0 by default): fees are already in
+``r_net``, but the explicit penalty discourages the noisy daily churn that dominated
+week-5 results.
+
 All rewards are multiplied by ``reward_scale`` so that per-step magnitudes are O(0.1–1),
 which keeps PPO/SAC value targets well conditioned.
 """
@@ -39,6 +43,7 @@ class RewardConfig:
     pt_alpha: float = 0.88
     pt_beta: float = 0.88
     pt_lambda_loss: float = 2.25
+    lambda_turn: float = 0.0
 
     def __post_init__(self) -> None:
         if self.mode not in REWARD_MODES:
@@ -74,6 +79,7 @@ def compute_reward(
     net_return: float,
     drawdown: float,
     return_window: NDArray[np.float64],
+    turnover: float = 0.0,
 ) -> float:
     """Compute the scaled reward for one step.
 
@@ -82,6 +88,7 @@ def compute_reward(
         net_return: Portfolio net return of this step (after costs).
         drawdown: Current drawdown from peak NAV, in ``[0, 1]``.
         return_window: Recent net returns including ``net_return`` (rolling window).
+        turnover: One-way turnover of this step's rebalance, in ``[0, 1]``.
 
     Returns:
         Scaled scalar reward.
@@ -101,4 +108,5 @@ def compute_reward(
         cvar_excess = max(0.0, historical_cvar(return_window) - config.cvar_target)
         reward = utility - config.lambda_cvar * cvar_excess - dd_penalty
 
+    reward -= config.lambda_turn * turnover
     return float(reward * config.reward_scale)

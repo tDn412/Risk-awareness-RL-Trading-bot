@@ -47,3 +47,10 @@ def test_historical_cvar() -> None:
 def test_unknown_mode_rejected() -> None:
     with pytest.raises(ValueError):
         RewardConfig("A9")
+
+
+def test_turnover_penalty_applies_to_all_modes() -> None:
+    for mode in ("A0", "A1", "A2", "A3"):
+        cfg = RewardConfig(mode, reward_scale=1.0, lambda_turn=0.01)
+        base = compute_reward(cfg, 0.01, 0.0, WINDOW)
+        assert compute_reward(cfg, 0.01, 0.0, WINDOW, turnover=0.5) == pytest.approx(base - 0.005)
