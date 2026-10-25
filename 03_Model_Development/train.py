@@ -77,6 +77,7 @@ def build_env(
         episode_length=None if full_period else int(env_cfg["episode_length"]),
         risk_window=int(env_cfg["risk_window"]),
         feature_scaler=scaler,
+        rebalance_speed=float(env_cfg.get("rebalance_speed", 1.0)),
     )
 
 
@@ -126,7 +127,11 @@ def train(
     )
     eval_env = Monitor(build_env(val_data, config, reward, scaler, full_period=True))
 
-    run_id = f"{agent_name}_{reward_mode}_{window}_s{seed}_{datetime.now():%Y%m%d_%H%M%S}"
+    # "." would be read as a file suffix by SB3 save paths, so 0.01 -> "T0p01"
+    turnover_tag = f"_T{reward.lambda_turnover:g}".replace(".", "p") if reward.lambda_turnover > 0 else ""
+    speed = float(config["env"].get("rebalance_speed", 1.0))
+    turnover_tag += f"_K{speed:g}".replace(".", "p") if speed < 1.0 else ""
+    run_id = f"{agent_name}_{reward_mode}{turnover_tag}_{window}_s{seed}_{datetime.now():%Y%m%d_%H%M%S}"
     out_dir = (Path(config.get("_tmp_dir", MODELS_DIR)) if dry_run else MODELS_DIR)
     log_dir = out_dir / "logs" if dry_run else LOGS_DIR
     best_dir = out_dir / f"{run_id}_best_tmp"
@@ -163,6 +168,7 @@ def train(
         "run_id": run_id,
         "agent": agent_name,
         "reward_mode": reward_mode,
+        "lambda_turnover": reward.lambda_turnover,
         "window": window,
         "seed": seed,
         "total_timesteps": total_timesteps,
@@ -195,11 +201,17 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--seed", type=int, help="Seed (default: first of training.seeds)")
     parser.add_argument("--window", help="Walk-forward window (default: training.window)")
     parser.add_argument("--timesteps", type=int, help="Override training.total_timesteps")
+    parser.add_argument("--lambda-turnover", type=float, help="Override reward.lambda_turnover")
+    parser.add_argument("--rebalance-speed", type=float, help="Override env.rebalance_speed")
     parser.add_argument("--dry-run", action="store_true", help="Synthetic data, ~1000 steps, temp outputs")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     config = load_config(args.config)
+    if args.lambda_turnover is not None:
+        config["reward"]["lambda_turnover"] = args.lambda_turnover
+    if args.rebalance_speed is not None:
+        config["env"]["rebalance_speed"] = args.rebalance_speed
     train_cfg = config["training"]
     reward_mode = args.reward or config["reward"]["mode"]
     seed = args.seed if args.seed is not None else int(train_cfg["seeds"][0])

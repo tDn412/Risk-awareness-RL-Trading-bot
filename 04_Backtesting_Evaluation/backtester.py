@@ -200,6 +200,8 @@ class RunSpec:
     run_id: str
     agent: str
     reward_mode: str
+    lambda_turnover: float
+    rebalance_speed: float
     seed: int
     window: str
     checkpoint: Path
@@ -218,6 +220,8 @@ def discover_runs(window: str, checkpoint: str = "best", models_dir: Path = MODE
                 run_id=summary["run_id"],
                 agent=summary["agent"],
                 reward_mode=summary["reward_mode"],
+                lambda_turnover=float(summary["config"]["reward"].get("lambda_turnover", 0.0)),
+                rebalance_speed=float(summary["config"]["env"].get("rebalance_speed", 1.0)),
                 seed=int(summary["seed"]),
                 window=window,
                 checkpoint=Path(summary[f"{checkpoint}_checkpoint"]),
@@ -264,11 +268,14 @@ def run_backtest(
     dates: pd.DatetimeIndex | None = None
     for run in runs:
         reward = RewardConfig(**{**run.config["reward"], "mode": run.reward_mode})
-        env = VN30PortfolioEnv(test, reward_config=reward, **env_kwargs)
+        # Agents trade with their own rebalance speed; baselines and EEB always rebalance fully.
+        env = VN30PortfolioEnv(test, reward_config=reward, rebalance_speed=run.rebalance_speed, **env_kwargs)
         agent = AGENTS[run.agent].load(run.checkpoint)
         ledger = _ledger_from_frame(run.run_id, rollout(agent, env))
         dates = pd.DatetimeIndex(ledger.nav.index)
-        group = f"{run.agent.upper()} {run.reward_mode}"
+        turnover_tag = f"-T{run.lambda_turnover:g}" if run.lambda_turnover > 0 else ""
+        turnover_tag += f"-K{run.rebalance_speed:g}" if run.rebalance_speed < 1.0 else ""
+        group = f"{run.agent.upper()}{turnover_tag} {run.reward_mode}"  # reward stays the last token
         add(run.run_id, ledger, group, "agent", run.seed)
 
         # Equivalent Equity Benchmark: same daily equity exposure, equal-weight stocks, daily rebalance.
@@ -339,7 +346,8 @@ def plot_curves(curves: dict[str, pd.DataFrame], window: str, path: Path) -> Non
         if name in (CASH_NAME, STATIC_NAME):
             continue
         reward = name.split()[-1]
-        color, style = styles.get(name, (REWARD_COLORS.get(reward, INK_SECONDARY), ":" if name.startswith("SAC") else "-"))
+        agent_style = ":" if name.startswith("SAC") else "--" if "-T" in name.split()[0] else "-"
+        color, style = styles.get(name, (REWARD_COLORS.get(reward, INK_SECONDARY), agent_style))
         for ax, column in zip(axes, ("nav", "drawdown", "cash_weight")):
             if column == "cash_weight" and name not in {n for n in curves if n.split()[-1] in REWARD_COLORS}:
                 continue

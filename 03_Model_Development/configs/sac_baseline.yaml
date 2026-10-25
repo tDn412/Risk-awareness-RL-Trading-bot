@@ -17,6 +17,7 @@ env:
   softmax_temperature: 0.2       # tau: logits in [-1, 1] -> effective range [-5, 5]
   episode_length: 252            # one trading year per episode, random start within train period
   risk_window: 60                # days used for rolling variance / CVaR95
+  rebalance_speed: 1.0           # kappa: fraction of the gap to target weights traded per day (1 = full rebalance)
 
 reward:
   mode: A0                       # overridden by --reward {A0,A1,A2,A3}
@@ -31,6 +32,7 @@ reward:
   pt_alpha: 0.88                 # A3: prospect-theory gain curvature
   pt_beta: 0.88                  # A3: prospect-theory loss curvature
   pt_lambda_loss: 2.25           # A3: loss aversion
+  lambda_turnover: 0.0           # all modes: penalty per unit of one-way daily turnover (0 = off)
 
 training:
   window: window_1

@@ -7,6 +7,11 @@
 * A3 — prospect-theory utility + CVaR barrier + drawdown barrier:
   ``U(r_net) - λ_cvar · max(0, CVaR95 - CVaR_target) - λ_dd · max(0, DD - d*)``.
 
+Every mode also subtracts an optional turnover penalty ``λ_turn · turnover`` (one-way
+turnover of the step, see ``VN30PortfolioEnv``); ``λ_turn = 0`` (default) leaves A0–A3 unchanged.
+Fees already reduce ``r_net``, but at ~0.1% of NAV per day they are too small against daily
+return noise for the agent to learn to trade less.
+
 All rewards are multiplied by ``reward_scale`` so that per-step magnitudes are O(0.1–1),
 which keeps PPO/SAC value targets well conditioned.
 """
@@ -39,6 +44,7 @@ class RewardConfig:
     pt_alpha: float = 0.88
     pt_beta: float = 0.88
     pt_lambda_loss: float = 2.25
+    lambda_turnover: float = 0.0
 
     def __post_init__(self) -> None:
         if self.mode not in REWARD_MODES:
@@ -74,6 +80,7 @@ def compute_reward(
     net_return: float,
     drawdown: float,
     return_window: NDArray[np.float64],
+    turnover: float = 0.0,
 ) -> float:
     """Compute the scaled reward for one step.
 
@@ -82,6 +89,7 @@ def compute_reward(
         net_return: Portfolio net return of this step (after costs).
         drawdown: Current drawdown from peak NAV, in ``[0, 1]``.
         return_window: Recent net returns including ``net_return`` (rolling window).
+        turnover: One-way portfolio turnover of this step, in ``[0, 1]``.
 
     Returns:
         Scaled scalar reward.
@@ -101,4 +109,5 @@ def compute_reward(
         cvar_excess = max(0.0, historical_cvar(return_window) - config.cvar_target)
         reward = utility - config.lambda_cvar * cvar_excess - dd_penalty
 
+    reward -= config.lambda_turnover * turnover
     return float(reward * config.reward_scale)

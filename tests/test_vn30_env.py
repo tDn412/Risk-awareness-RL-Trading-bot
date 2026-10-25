@@ -140,3 +140,17 @@ def test_unlisted_assets_get_zero_weight() -> None:
     assert weights.sum() == pytest.approx(1.0)
     env.step(np.ones(4, dtype=np.float32))
     assert env.shares[2] == 0
+
+
+def test_partial_rebalance_moves_fraction_of_gap() -> None:
+    data = make_synthetic_market_data(n_days=20, n_assets=3, constant_prices=True)
+    full = VN30PortfolioEnv(data, initial_cash=CAPITAL)
+    half = VN30PortfolioEnv(data, initial_cash=CAPITAL, rebalance_speed=0.5)
+    full.reset(seed=0)
+    half.reset(seed=0)
+    _, _, _, _, info_full = full.step(_all_in(3, 1))
+    _, _, _, _, info_half = half.step(_all_in(3, 1))
+    assert half.weights()[1] == pytest.approx(0.5 * full.weights()[1], abs=0.01)
+    assert info_half["turnover"] == pytest.approx(0.5 * info_full["turnover"], abs=0.01)
+    with pytest.raises(ValueError):
+        VN30PortfolioEnv(data, rebalance_speed=0.0)
