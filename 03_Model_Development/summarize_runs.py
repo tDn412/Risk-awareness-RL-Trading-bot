@@ -1,7 +1,7 @@
 """Aggregate validation metrics of finished training runs.
 
 Reads ``outputs/models/*.json`` (written by ``train.py``) and prints / saves a table
-with mean ± std across seeds per ``(agent, reward, window)`` for the best-on-validation
+with mean ± std across seeds per ``(agent, reward, lambda_turnover, window)`` for the best-on-validation
 checkpoint.
 
 Example:
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MODELS_DIR = REPO_ROOT / "outputs" / "models"
-GROUP_KEYS = ["agent", "reward_mode", "window"]
+GROUP_KEYS = ["agent", "reward_mode", "lambda_turnover", "window"]
 REPORT_METRICS = [
     "Total Return (%)",
     "Sharpe Ratio",
@@ -40,6 +40,7 @@ def load_runs(models_dir: Path = MODELS_DIR, checkpoint: str = "best") -> pd.Dat
         run = json.loads(path.read_text(encoding="utf-8"))
         if run.get("dry_run"):
             continue
+        run.setdefault("lambda_turnover", run["config"]["reward"].get("lambda_turnover", 0.0))
         row = {key: run[key] for key in GROUP_KEYS + ["seed", "run_id"]}
         row.update(run["validation"][checkpoint])
         rows.append(row)

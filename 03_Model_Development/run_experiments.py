@@ -27,14 +27,27 @@ LOG_DIR = REPO_ROOT / "outputs" / "logs"
 
 
 def run_one(
-    config: str, agent: str, reward: str, window: str, seed: int, timesteps: int | None
+    config: str,
+    agent: str,
+    reward: str,
+    window: str,
+    seed: int,
+    timesteps: int | None,
+    lambda_turnover: float | None = None,
+    rebalance_speed: float | None = None,
 ) -> tuple[str, int]:
     """Run a single training process; return ``(label, exit_code)``."""
-    label = f"{agent}_{reward}_{window}_s{seed}"
+    turnover_tag = f"_T{lambda_turnover:g}".replace(".", "p") if lambda_turnover else ""
+    turnover_tag += f"_K{rebalance_speed:g}".replace(".", "p") if rebalance_speed is not None else ""
+    label = f"{agent}_{reward}{turnover_tag}_{window}_s{seed}"
     cmd = [sys.executable, str(TRAIN_SCRIPT), "--config", config, "--reward", reward, "--window", window,
            "--seed", str(seed)]
     if timesteps is not None:
         cmd += ["--timesteps", str(timesteps)]
+    if lambda_turnover is not None:
+        cmd += ["--lambda-turnover", str(lambda_turnover)]
+    if rebalance_speed is not None:
+        cmd += ["--rebalance-speed", str(rebalance_speed)]
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     with (LOG_DIR / f"train_{label}.log").open("w", encoding="utf-8") as log:
         code = subprocess.call(cmd, stdout=log, stderr=subprocess.STDOUT, cwd=REPO_ROOT)
@@ -50,6 +63,8 @@ def main() -> None:
     parser.add_argument("--windows", nargs="+", help="Default: training.window from config")
     parser.add_argument("--seeds", nargs="+", type=int, help="Default: training.seeds from config")
     parser.add_argument("--timesteps", type=int)
+    parser.add_argument("--rebalance-speed", type=float, help="Default: env.rebalance_speed from config")
+    parser.add_argument("--lambda-turnovers", nargs="+", type=float, help="Default: reward.lambda_turnover from config")
     parser.add_argument("--parallel", type=int, default=4)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -58,10 +73,11 @@ def main() -> None:
         config = yaml.safe_load(fh)
     seeds = args.seeds or config["training"]["seeds"]
     windows = args.windows or [config["training"]["window"]]
-    jobs = list(itertools.product(windows, args.rewards, seeds))
+    turnovers: list[float | None] = list(args.lambda_turnovers) if args.lambda_turnovers else [None]
+    jobs = list(itertools.product(windows, args.rewards, turnovers, seeds))
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
         results = list(
-            pool.map(lambda job: run_one(args.config, config["agent"], job[1], job[0], job[2], args.timesteps), jobs)
+            pool.map(lambda job: run_one(args.config, config["agent"], job[1], job[0], job[3], args.timesteps, job[2], args.rebalance_speed), jobs)
         )
     failed = [label for label, code in results if code != 0]
     logger.info("Done: %d runs, %d failed %s", len(results), len(failed), failed)

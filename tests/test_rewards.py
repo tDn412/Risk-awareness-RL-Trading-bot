@@ -33,6 +33,16 @@ def test_a3_prospect_and_cvar() -> None:
     assert compute_reward(cfg, -0.02, 0.0, WINDOW) == pytest.approx(expected)
 
 
+def test_turnover_penalty_applies_to_every_mode() -> None:
+    for mode in ("A0", "A1", "A2", "A3"):
+        base = RewardConfig(mode, reward_scale=1.0)
+        penalised = RewardConfig(mode, reward_scale=1.0, lambda_turnover=0.02)
+        assert compute_reward(base, 0.01, 0.0, WINDOW, turnover=0.4) == compute_reward(base, 0.01, 0.0, WINDOW)
+        assert compute_reward(penalised, 0.01, 0.0, WINDOW, turnover=0.4) == pytest.approx(
+            compute_reward(base, 0.01, 0.0, WINDOW) - 0.02 * 0.4
+        )
+
+
 def test_prospect_loss_aversion() -> None:
     gain = prospect_utility(0.01, 0.88, 0.88, 2.25)
     loss = prospect_utility(-0.01, 0.88, 0.88, 2.25)

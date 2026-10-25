@@ -3,7 +3,9 @@
 Timing convention (one step = one trading day ``t``):
     1. The agent observes features computed up to and including the close of day ``t``.
     2. The action (31 logits: cash + 30 stocks) is mapped to target weights with a
-       temperature softmax; unlisted stocks are masked to zero weight.
+       temperature softmax; unlisted stocks are masked to zero weight. With
+       ``rebalance_speed`` κ < 1 the portfolio only moves a fraction κ of the way from its
+       current weights to that target (partial rebalancing), which damps day-to-day churn.
     3. Orders are executed at the closing auction (ATC) of day ``t`` under HOSE rules:
        * price band ±7% around the reference price (previous close): order price is
          clipped into the band; a stock closing at the ceiling cannot be bought and one
@@ -53,6 +55,7 @@ LIMIT_LOCK_TOLERANCE = 0.002
 DEFAULT_INITIAL_CASH = 1_000_000_000.0  # 1 billion VND
 DEFAULT_SOFTMAX_TEMPERATURE = 0.2
 DEFAULT_RISK_WINDOW = 60
+DEFAULT_REBALANCE_SPEED = 1.0  # κ = 1: trade fully to the target every day
 CASH_INDEX = 0
 
 
@@ -112,6 +115,7 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         episode_length: int | None = None,
         risk_window: int = DEFAULT_RISK_WINDOW,
         feature_scaler: FeatureScaler | None = None,
+        rebalance_speed: float = DEFAULT_REBALANCE_SPEED,
     ) -> None:
         """Create the environment.
 
@@ -125,6 +129,8 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
                 period from the first day.
             risk_window: Rolling window (days) for variance / CVaR in rewards and info.
             feature_scaler: Scaler fitted on training data; fitted on ``data`` if omitted.
+            rebalance_speed: Fraction κ in ``(0, 1]`` of the gap between current and target
+                weights traded each day; 1.0 rebalances fully.
         """
         super().__init__()
         if data is None:
@@ -135,6 +141,8 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
                 data = make_synthetic_market_data()
         if data.n_days < 2:
             raise ValueError("Need at least 2 trading days.")
+        if not 0.0 < rebalance_speed <= 1.0:
+            raise ValueError("rebalance_speed must be in (0, 1].")
         if episode_length is not None and not 1 <= episode_length < data.n_days:
             raise ValueError(f"episode_length must be in [1, {data.n_days - 1}].")
 
@@ -142,6 +150,7 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.reward_config = reward_config or RewardConfig()
         self.initial_cash = float(initial_cash)
         self.temperature = float(softmax_temperature)
+        self.rebalance_speed = float(rebalance_speed)
         self.episode_length = episode_length
         self.risk_window = int(risk_window)
 
@@ -320,6 +329,9 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         """Execute one trading day (see module docstring for timing)."""
         value_before = self.portfolio_value()
         target = self.action_to_weights(action)
+        if self.rebalance_speed < 1.0:
+            current = self.weights()
+            target = current + self.rebalance_speed * (target - current)
         execution = self._execute(target)
 
         self._advance_day()
@@ -330,7 +342,7 @@ class VN30PortfolioEnv(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         self._returns.append(net_return)
         window = np.fromiter(self._returns, dtype=np.float64)
 
-        reward = compute_reward(self.reward_config, net_return, drawdown, window)
+        reward = compute_reward(self.reward_config, net_return, drawdown, window, execution.turnover)
         terminated = self._t >= self._end
         info: dict[str, Any] = {
             "portfolio_value": value_after,
