@@ -2,8 +2,8 @@
 
 Example:
     python 03_Model_Development/run_experiments.py --config ppo_baseline.yaml \
-        --rewards A0 A1 A2 A3 --parallel 4
-Each run logs to ``outputs/logs/train_<agent>_<reward>_s<seed>.log``.
+        --rewards A0 A1 A2 A3 --windows window_2 window_3 window_4 --parallel 4
+Each run logs to ``outputs/logs/train_<agent>_<reward>_<window>_s<seed>.log``.
 """
 
 from __future__ import annotations
@@ -26,10 +26,13 @@ CONFIG_DIR = REPO_ROOT / "03_Model_Development" / "configs"
 LOG_DIR = REPO_ROOT / "outputs" / "logs"
 
 
-def run_one(config: str, agent: str, reward: str, seed: int, timesteps: int | None) -> tuple[str, int]:
+def run_one(
+    config: str, agent: str, reward: str, window: str, seed: int, timesteps: int | None
+) -> tuple[str, int]:
     """Run a single training process; return ``(label, exit_code)``."""
-    label = f"{agent}_{reward}_s{seed}"
-    cmd = [sys.executable, str(TRAIN_SCRIPT), "--config", config, "--reward", reward, "--seed", str(seed)]
+    label = f"{agent}_{reward}_{window}_s{seed}"
+    cmd = [sys.executable, str(TRAIN_SCRIPT), "--config", config, "--reward", reward, "--window", window,
+           "--seed", str(seed)]
     if timesteps is not None:
         cmd += ["--timesteps", str(timesteps)]
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -44,6 +47,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="ppo_baseline.yaml")
     parser.add_argument("--rewards", nargs="+", default=["A0", "A1", "A2", "A3"])
+    parser.add_argument("--windows", nargs="+", help="Default: training.window from config")
     parser.add_argument("--seeds", nargs="+", type=int, help="Default: training.seeds from config")
     parser.add_argument("--timesteps", type=int)
     parser.add_argument("--parallel", type=int, default=4)
@@ -53,10 +57,11 @@ def main() -> None:
     with (CONFIG_DIR / args.config).open(encoding="utf-8") as fh:
         config = yaml.safe_load(fh)
     seeds = args.seeds or config["training"]["seeds"]
-    jobs = list(itertools.product(args.rewards, seeds))
+    windows = args.windows or [config["training"]["window"]]
+    jobs = list(itertools.product(windows, args.rewards, seeds))
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
         results = list(
-            pool.map(lambda job: run_one(args.config, config["agent"], job[0], job[1], args.timesteps), jobs)
+            pool.map(lambda job: run_one(args.config, config["agent"], job[1], job[0], job[2], args.timesteps), jobs)
         )
     failed = [label for label, code in results if code != 0]
     logger.info("Done: %d runs, %d failed %s", len(results), len(failed), failed)

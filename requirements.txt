@@ -2,6 +2,7 @@
 torch>=2.0.0
 gymnasium>=0.29.1
 stable-baselines3>=2.3.0
+tensorboard>=2.14.0
 
 # Financial Data & Quantitative Indicators
 vnstock>=4.0.0
