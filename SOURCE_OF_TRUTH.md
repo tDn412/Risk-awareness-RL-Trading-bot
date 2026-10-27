@@ -261,24 +261,6 @@ Risk-awareness RL Trading bot/
 │   ├── components/                    # Biểu đồ Plotly: NAV, Underwater Drawdown, Tỷ trọng
 │   └── requirements.txt               # Gói phụ thuộc riêng cho dashboard
 │
-├── 06_Docs_and_Reports/               # [O6] Tài liệu Báo cáo, Slide & Thuyết trình
-│   ├── bao_cao_giua_ky_de_tai_Tu.md   # Báo cáo giữa kỳ markdown chi tiết
-│   ├── ke_hoach_phat_trien_chi_tiet.md# Kế hoạch phát triển 6 tuần chi tiết
-│   ├── kich_ban_trao_doi_nhom.md      # Kịch bản họp nhóm & bảo vệ đề tài
-│   ├── diagnostic_log.md              # Nhật ký sự cố, nguyên nhân gốc & giải pháp phòng ngừa
-│   ├── beamer_presentation/           # Slide thuyết trình LaTeX Beamer
-│   │   ├── main.tex                   # Mã nguồn chính Beamer
-│   │   ├── preamble.tex               # Cấu hình gói và màu sắc chuẩn học thuật
-│   │   └── figures/                   # Biểu đồ nhúng trong Beamer
-│   ├── presentation/                  # Slide thuyết trình động & Video Remotion (TypeScript/React)
-│   │   ├── src/                       # Các scenes Remotion và video dọc TikTok 9:16
-│   │   └── package.json               # Cấu hình dự án Remotion
-│   ├── learning/                      # Tài liệu học tập & giải thích trực quan đề tài
-│   │   └── hoc_du_an_rl_vn30.html     # Cẩm nang tương tác giải thích toàn diện dự án
-│   ├── figures/                       # Hình ảnh và biểu đồ phục vụ báo cáo
-│   ├── final_report/                  # Thư mục chứa báo cáo cuối khóa luận
-│   └── README.md                      # Hướng dẫn tài liệu báo cáo
-│
 ├── data/                              # Dữ liệu tập trung (Được gitignore, chỉ commit .gitkeep)
 │   ├── raw/                           # Dữ liệu thô tải từ vnstock
 │   │   ├── prices/                    # 30 file CSV OHLCV theo ngày
@@ -380,7 +362,7 @@ python 02_Data_Pipeline/run_pipeline.py --dry-run
 - **Backtesting & Evaluation:** Kiểm thử Out-of-sample đối chiếu đủ 5 Baselines; xuất bảng chỉ số định lượng 11 metrics; kiểm định thống kê $p$-value của các giả thuyết $H_1, H_2, H_3$.
 
 ### 10.3 Chu trình Xử lý Sự cố (Diagnostic Loop)
-Mỗi khi phát sinh lỗi trong quá trình thực thi, không được thử lại một cách mù quáng (blind retry) mà phải tuân thủ mẫu ghi nhận tại [diagnostic_log.md](file:///home/tu/Documents/Risk-awareness%20RL%20Trading%20bot/06_Docs_and_Reports/diagnostic_log.md):
+Mỗi khi phát sinh lỗi trong quá trình thực thi, không được thử lại một cách mù quáng (blind retry) mà phải ghi lại sự cố (trong mô tả PR hoặc commit sửa lỗi) theo các bước sau:
 - Xác định chính xác lớp phát sinh lỗi (Collector, Processor, Environment, Agent, Backtest).
 - Phân tích nguyên nhân gốc rễ (Root Cause).
 - Áp dụng biện pháp khắc phục triệt để.

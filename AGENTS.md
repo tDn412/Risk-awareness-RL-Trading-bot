@@ -70,7 +70,6 @@ Always use `skip_existing=True` pattern when downloading to avoid redundant call
 │   └── metrics.py               # Sharpe, Sortino, CVaR, Max Drawdown
 ├── 05_Deployment_Demo/
 │   └── streamlit_app.py         # Interactive Streamlit dashboard
-├── 06_Docs_and_Reports/         # Weekly reports, figures
 ├── data/
 │   ├── raw/                     # Immutable raw downloads — NEVER edit manually
 │   ├── processed/               # Output of processors/
@@ -329,7 +328,7 @@ TEST ADDED: <new test that would have caught this>
 PREVENTION: <what was updated in AGENTS.md / harness to prevent recurrence>
 ```
 
-Append every incident to `06_Docs_and_Reports/diagnostic_log.md`.
+Write every incident up in the PR description (or commit message) of the fix.
 
 ### Known Historical Failures
 

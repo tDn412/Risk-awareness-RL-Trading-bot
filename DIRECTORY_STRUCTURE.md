@@ -54,12 +54,6 @@ Risk-awareness RL Trading bot/
 │   ├── components/                    # Biểu đồ Plotly: NAV, Underwater Drawdown, Stacked Weights
 │   └── requirements.txt               # Gói phụ thuộc riêng cho dashboard
 │
-├── 06_Docs_and_Reports/               # [O6] Tài liệu Báo cáo & Thuyết trình
-│   ├── final_report/                  # Toàn văn báo cáo cuối kỳ (LaTeX / Word / Markdown)
-│   ├── presentation/                  # Slide thuyết trình bảo vệ đề tài (Remotion / Slide Deck)
-│   ├── figures/                       # Các biểu đồ kết quả xuất ra phục vụ bài báo cáo
-│   └── kich_ban_trao_doi_nhom.md      # Biên bản và kịch bản thảo luận nhóm
-│
 ├── data/                              # Quản lý dữ liệu tập trung (được gitignore trừ sample)
 │   ├── raw/                           # Dữ liệu thô tải từ vnstock
 │   │   ├── prices/                    # 30 file CSV OHLCV theo ngày
