@@ -1,6 +1,7 @@
-# Deployment & Demo Requirements (read-only viewer of outputs/backtest_results)
-streamlit>=1.30.0
-plotly>=5.18.0
-pandas>=2.0.0
-numpy>=1.24.0,<2.0.0
-tabulate>=0.9.0
+# Demo only reads the saved CSVs in outputs/backtest_results, so it needs no torch/vnstock.
+# Streamlit Community Cloud picks this file up because it sits next to app.py.
+streamlit==1.45.1
+plotly==6.0.1
+pandas==2.2.3
+numpy==2.2.6
+pyarrow==20.0.0
