@@ -1,7 +1,8 @@
 # Demo only reads the saved CSVs in outputs/backtest_results, so it needs no torch/vnstock.
 # Streamlit Community Cloud picks this file up because it sits next to app.py.
-streamlit==1.45.1
-plotly==6.0.1
-pandas==2.2.3
-numpy==2.2.6
-pyarrow==20.0.0
+# Versions chosen to have prebuilt wheels for Python 3.11-3.14.
+streamlit==1.50.0
+plotly==6.3.1
+pandas==2.3.3
+numpy==2.3.4
+pyarrow==22.0.0
