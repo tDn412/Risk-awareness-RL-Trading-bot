@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import streamlit as st
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -149,6 +150,81 @@ def curve_chart(
     )
     fig.update_xaxes(showgrid=False, tickformat="%m/%Y")
     fig.update_yaxes(gridcolor="rgba(128,128,128,0.18)", ticksuffix="%" if column == "drawdown" else "")
+    return fig
+
+
+def replay_chart(curves: dict[str, pd.DataFrame], bot: str, year: str, step: int = 3) -> go.Figure:
+    """Animated day-by-day replay: NAV of bot / VN30 / equal weight and the bot's cash weight."""
+    names = [bot, VN30, EQUAL]
+    nav = pd.DataFrame({n: curves[n]["nav"] for n in names})
+    cash = curves[bot]["cash_weight"].bfill().fillna(0).rename("cash")  # already in %
+    dates = nav.index
+    ends = list(range(1, len(dates), step))
+    if ends[-1] != len(dates) - 1:
+        ends.append(len(dates) - 1)
+    styles = {bot: (BOT_COLOR, "solid", 3.0), VN30: LINE_STYLES[VN30], EQUAL: LINE_STYLES[EQUAL]}
+
+    def traces(k: int) -> list[go.Scatter]:
+        out = [
+            go.Scatter(x=dates[: k + 1], y=nav[n].iloc[: k + 1], mode="lines", name=LABELS[n],
+                       line={"color": styles[n][0], "dash": styles[n][1], "width": styles[n][2]})
+            for n in names
+        ]
+        out.append(go.Scatter(x=dates[: k + 1], y=cash.iloc[: k + 1], mode="lines", name="Tiền mặt bot giữ",
+                              line={"color": BOT_COLOR, "width": 1.5}, fill="tozeroy",
+                              fillcolor="rgba(31,111,235,0.15)", showlegend=False))
+        return out
+
+    def label(k: int) -> str:
+        parts = [f"<b>{dates[k]:%d/%m/%Y}</b>"] + [
+            f"{LABELS[n]}: {pct(nav[n].iloc[k] - 100, sign=True)}" for n in names
+        ] + [f"Tiền mặt bot giữ: {pct(cash.iloc[k], 0)}"]
+        return "<br>".join(parts)
+
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.75, 0.25], vertical_spacing=0.06,
+                        subplot_titles=(f"Phát lại năm {year}: giá trị danh mục (bắt đầu = 100)",
+                                        "Tỷ lệ tiền mặt bot giữ (%)"))
+    for i, tr in enumerate(traces(ends[0])):
+        fig.add_trace(tr, row=1 if i < 3 else 2, col=1)
+    annotation = {"x": 0.01, "y": 0.98, "xref": "paper", "yref": "paper", "xanchor": "left", "yanchor": "top",
+                  "align": "left", "showarrow": False, "bgcolor": "rgba(255,255,255,0.85)",
+                  "bordercolor": "#d0d7de", "borderwidth": 1, "font": {"size": 12}}
+    base_annotations = list(fig.layout.annotations)
+    fig.frames = [
+        go.Frame(data=traces(k), name=str(k), traces=[0, 1, 2, 3],
+                 layout={"annotations": base_annotations + [dict(annotation, text=label(k))]})
+        for k in ends
+    ]
+    lo = min(nav.min().min(), 100) - 3
+    hi = max(nav.max().max(), 100) + 3
+    fig.update_layout(
+        height=520,
+        margin={"l": 0, "r": 0, "t": 40, "b": 0},
+        annotations=base_annotations + [dict(annotation, text=label(ends[0]))],
+        legend={"orientation": "h", "y": 1.13, "x": 1, "xanchor": "right"},
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        updatemenus=[{
+            "type": "buttons", "direction": "left", "x": 0.0, "y": 1.13, "xanchor": "left", "showactive": False,
+            "buttons": [
+                {"label": "▶ Phát", "method": "animate",
+                 "args": [None, {"frame": {"duration": 60, "redraw": True}, "fromcurrent": True,
+                                 "transition": {"duration": 0}}]},
+                {"label": "⏸ Dừng", "method": "animate",
+                 "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"}]},
+            ],
+        }],
+        sliders=[{
+            "x": 0.0, "len": 1.0, "y": -0.02, "pad": {"t": 30}, "currentvalue": {"visible": False},
+            "steps": [{"label": f"{dates[k]:%m/%Y}" if dates[k].month != dates[max(k - step, 0)].month else "", "method": "animate",
+                       "args": [[str(k)], {"frame": {"duration": 0, "redraw": True}, "mode": "immediate"}]}
+                      for k in ends],
+        }],
+    )
+    fig.update_xaxes(range=[dates[0], dates[-1]], showgrid=False, tickformat="%m/%Y")
+    fig.update_yaxes(range=[lo, hi], gridcolor="rgba(128,128,128,0.18)", row=1, col=1)
+    fig.update_yaxes(range=[0, max(cash.max() * 1.1, 10)], ticksuffix="%", gridcolor="rgba(128,128,128,0.18)",
+                     row=2, col=1)
     return fig
 
 
@@ -314,14 +390,22 @@ def main() -> None:
         placeholder="Ví dụ: Bot A0 để thấy bot chỉ ham lời lỗ thế nào",
     )
     names = [bot, VN30, EQUAL] + extra
-    st.plotly_chart(
-        curve_chart(curves, names, bot, "nav", f"Giá trị danh mục năm {year} (bắt đầu = 100)", 400),
-        use_container_width=True,
-    )
-    st.plotly_chart(
-        curve_chart(curves, names, bot, "drawdown", "Mức sụt so với đỉnh gần nhất (%)", 260),
-        use_container_width=True,
-    )
+    replay_tab, full_tab = st.tabs(["▶ Phát lại từng ngày", "Cả năm và mức sụt"])
+    with replay_tab:
+        st.caption(
+            "Bấm ▶ Phát để xem bot đi qua từng phiên của năm, so với VN30 và chia đều; "
+            "kéo thanh trượt để nhảy tới một ngày bất kỳ. Ô góc trái cho biết lãi/lỗ tới ngày đó."
+        )
+        st.plotly_chart(replay_chart(curves, bot, year), use_container_width=True, config={"displayModeBar": False})
+    with full_tab:
+        st.plotly_chart(
+            curve_chart(curves, names, bot, "nav", f"Giá trị danh mục năm {year} (bắt đầu = 100)", 400),
+            use_container_width=True,
+        )
+        st.plotly_chart(
+            curve_chart(curves, names, bot, "drawdown", "Mức sụt so với đỉnh gần nhất (%)", 260),
+            use_container_width=True,
+        )
 
     # ---- Four years
     st.subheader("Tổng kết 4 năm")
